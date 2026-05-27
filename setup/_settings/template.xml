@@ -1,10 +1,65 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <feed>
 <entry>
-<content></content>
+<content>customer
+ name(string){255}!
+ name_kana(string){255}
+ industry(string){100}
+ company_size(string){50}
+ phone(string){20}
+ fax(string){20}
+ postal_code(string){10}
+ address(string){500}
+ website(string){500}
+ status(string){50}!
+ source(string){100}
+ annual_revenue(long)
+ assigned_uid(string){255}
+ memo(string){2000}
+ is_deleted(boolean)
+contact
+ family_name(string){100}!
+ given_name(string){100}!
+ family_name_kana(string){100}
+ given_name_kana(string){100}
+ department(string){200}
+ title(string){100}
+ email(string){255}
+ phone(string){20}
+ mobile(string){20}
+ is_primary(boolean)
+ memo(string){2000}
+ is_deleted(boolean)
+deal
+ name(string){255}!
+ customer_uri(string){500}!
+ amount(long)
+ probability(int){100}
+ stage(string){50}!
+ expected_close_date(date)
+ actual_close_date(date)
+ contact_uri(string){500}
+ assigned_uid(string){255}
+ memo(string){2000}
+ is_deleted(boolean)
+activity
+ activity_type(string){50}!
+ subject(string){255}!
+ activity_date(date)!
+ deal_uri(string){500}
+ description(string){2000}
+ outcome(string){500}
+ next_action(string){500}
+ contact_uri(string){500}
+ created_uid(string){255}
+ is_deleted(boolean)
+userprofile
+ display_name(string){100}!
+</content>
 <link href="/_settings/template" rel="self"></link>
 <rights></rights>
 </entry>
 <entry>
   <link href="/_settings/template_property" rel="self"/>
 </entry>
+</feed>

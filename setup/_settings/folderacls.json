@@ -1,0 +1,47 @@
+[
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:/_group/sales,CURDE" },
+      { "uri": "urn:vte.cx:acl:/_group/viewer,RE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/crm" }]
+  },
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:/_group/sales,CURDE" },
+      { "uri": "urn:vte.cx:acl:/_group/viewer,RE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/crm/customer" }]
+  },
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:/_group/sales,CURDE" },
+      { "uri": "urn:vte.cx:acl:/_group/viewer,RE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/crm/deal" }]
+  },
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:+,CURDE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/crm/user" }]
+  },
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:+,CURDE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/_group/sales" }]
+  },
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:+,CURDE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/_group/viewer" }]
+  }
+]
