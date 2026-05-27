@@ -41,3 +41,6 @@ pnpm-lock.yaml
 
 .nvmrc
 .vercel
+
+# vte.cx settings (contains credentials)
+setup/_settings/properties.xml
