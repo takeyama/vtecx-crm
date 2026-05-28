@@ -1,0 +1,24 @@
+title: vtecx-crm リファレンス
+description: vte.cx BaaS × Next.js App Router の CRM 実装リファレンス。SDK の使い方・ACL・スキーマ設計のパターン集。
+theme: jekyll-theme-cayman
+
+# AI クローラー向けファイルをそのまま出力
+include:
+  - llms.txt
+  - CONTEXT.md
+
+# Next.js のビルド成果物を除外
+exclude:
+  - node_modules/
+  - .next/
+  - src/
+  - "*.ts"
+  - "*.tsx"
+  - "*.json"
+  - "*.xml"
+  - pnpm-lock.yaml
+  - package.json
+  - tsconfig.json
+  - next.config.ts
+  - postcss.config.mjs
+  - tailwind.config.ts
