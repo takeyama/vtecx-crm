@@ -79,6 +79,10 @@ function SettingsContent() {
             <Typography fontFamily="monospace">{info?.uid ?? '—'}</Typography>
           </Box>
           <Box>
+            <Typography variant="caption" color="text.secondary">メールアドレス</Typography>
+            <Typography>{info?.email ?? '—'}</Typography>
+          </Box>
+          <Box>
             <Typography variant="caption" color="text.secondary">権限</Typography>
             <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
               {roles.length > 0 ? (

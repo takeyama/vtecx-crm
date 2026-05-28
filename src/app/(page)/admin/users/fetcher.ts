@@ -15,19 +15,27 @@ export const fetchUsers = async (): Promise<UserRow[]> => {
   ])
 
   const entries = profileData ? normalizeEntries(profileData) : []
-  const rights = JSON.parse(
-    groupData?.rights ?? groupData?.feed?.entry?.[0]?.rights ?? '{}'
+  const groupEntries = groupData ? normalizeEntries(groupData) : []
+  const salesUids = new Set(
+    groupEntries
+      .filter((e) => e.groupmembers?.group_name === 'sales')
+      .map((e) => e.groupmembers?.uid ?? '')
+      .filter(Boolean)
   )
-  const salesUids: string[] = rights.sales ?? []
-  const viewerUids: string[] = rights.viewer ?? []
+  const viewerUids = new Set(
+    groupEntries
+      .filter((e) => e.groupmembers?.group_name === 'viewer')
+      .map((e) => e.groupmembers?.uid ?? '')
+      .filter(Boolean)
+  )
 
   return entries.map((e) => {
     const uid: string = e.link?.find((l: any) => l.___rel === 'self')?.___href?.split('/').pop() ?? ''
     return {
       uid,
       display_name: e.userprofile?.display_name,
-      isSales: salesUids.includes(uid),
-      isViewer: viewerUids.includes(uid),
+      isSales: salesUids.has(uid),
+      isViewer: viewerUids.has(uid),
     }
   })
 }

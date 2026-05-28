@@ -168,7 +168,8 @@ import { useAuthContext } from '@/contexts/AuthContext'
 
 function SomeContent() {
   const { info } = useAuthContext()
-  // info.uid, info.isAdmin, info.isSales, info.isViewer, info.display_name
+  // info.uid, info.isAdmin, info.isSales, info.isViewer
+  // info.display_name, info.email
 }
 ```
 
@@ -271,5 +272,18 @@ contributor: [
 | `fetchCustomers` を外側コンポーネントの `useEffect` に書く | 内側コンポーネントに移動する |
 | 更新時に `contributor` を省略する | `existing?.contributor` を必ず引き継ぐ |
 | `entry.id` から `,` 以降を含めたままパス操作する | `entry.id.split(',')[0]` でパス部分のみ取り出す |
-| `entry.title` や `entry.subtitle` をデータフィールドに使う | 専用スキーマのフィールドに定義する |
+| `entry.title` / `entry.rights` / `entry.summary` をカスタムデータフィールドに使う | `template.xml` でスキーマ定義した専用エンティティのフィールドに入れる |
+| `rights: JSON.stringify({...})` で構造データを文字列として詰め込む | スキーマ定義したフィールドに直接セットする |
 | API ルートでロールチェックを実装する | ACL（contributor / folderacls）に任せる |
+
+### ⚠️ スキーマ定義の原則（必須）
+
+**保存するデータだけでなく、レスポンスとして返すフィールドも `template.xml` で定義する。**
+
+```typescript
+// ❌ NG: Atom標準フィールドに JSON 文字列を詰め込む
+return vtecxnext.response(200, { rights: JSON.stringify({ uid, isAdmin }) })
+
+// ✅ OK: template.xml に userprofile.uid / userprofile.is_admin を定義済み
+return vtecxnext.response(200, { userprofile: { uid, is_admin: isAdmin } })
+```

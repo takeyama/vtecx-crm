@@ -99,6 +99,25 @@ password: **********                 ← パスワード
 - 全フィールドを専用スキーマで定義する
 - フィールド名は `snake_case` で記述する（例: `scheduled_date`, `next_action`）
 
+#### ⚠️ スキーマ定義の原則（重要）
+
+**エントリに含める全てのカスタムフィールドは `template.xml` でスキーマ定義すること。**  
+これは保存するデータだけでなく、API レスポンスとして返すフィールドも対象。
+
+```typescript
+// ❌ NG: 標準 Atom フィールド(rights/title/summary)に JSON 文字列を詰め込む
+const entry = { rights: JSON.stringify({ uid, isAdmin, isSales }) }
+
+// ✅ OK: スキーマ定義したエンティティのフィールドに直接セット
+// template.xml に userprofile.uid / userprofile.is_admin 等を定義済み
+const entry = { userprofile: { uid, is_admin: isAdmin, is_sales: isSales } }
+```
+
+この原則を守ることで：
+- vte.cx のバリデーション・インデックスが正しく機能する
+- `pnpm download:typings` で型定義が自動生成される
+- エントリの構造が自己文書化される
+
 #### 例
 
 ```xml

@@ -64,10 +64,21 @@ export interface ActivityEntity {
 
 export interface UserProfileEntity {
   display_name?: string
+  uid?: string
+  is_admin?: boolean
+  is_sales?: boolean
+  is_viewer?: boolean
+  email?: string
+}
+
+export interface GroupmembersEntity {
+  group_name?: string
+  uid?: string
 }
 
 export interface CrmEntry {
   userprofile?: UserProfileEntity
+  groupmembers?: GroupmembersEntity
   id?: string
   link?: { ___href?: string; ___rel?: string }[]
   contributor?: { uri?: string; email?: string }[]

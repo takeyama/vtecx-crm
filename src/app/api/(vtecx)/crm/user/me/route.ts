@@ -10,16 +10,26 @@ export const GET = async (req: NextRequest): Promise<Response> => {
 
   try {
     const uid = await vtecxnext.uid()
-    const [profile, isAdmin, isSales, isViewer] = await Promise.all([
+    const [profile, isAdmin, isSales, isViewer, userEntry] = await Promise.all([
       vtecxnext.getEntry(`/crm/user/${uid}`).catch(() => null),
       vtecxnext.isGroupMember('/_group/$admin').catch(() => false),
       vtecxnext.isGroupMember('/_group/sales').catch(() => false),
       vtecxnext.isGroupMember('/_group/viewer').catch(() => false),
+      vtecxnext.getEntry(`/_user/${uid}`).catch(() => null),
     ])
+
+    const email = userEntry?.contributor?.[0]?.email || undefined
 
     const entry: any = {
       ...(profile ?? {}),
-      rights: JSON.stringify({ uid, isAdmin, isSales, isViewer }),
+      userprofile: {
+        ...(profile?.userprofile ?? {}),
+        uid,
+        is_admin: isAdmin,
+        is_sales: isSales,
+        is_viewer: isViewer,
+        email,
+      },
     }
     return vtecxnext.response(200, entry)
   } catch (e) {

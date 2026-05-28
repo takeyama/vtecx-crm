@@ -203,14 +203,20 @@
 **レスポンス**:
 ```json
 {
-  "userprofile": { "display_name": "山田太郎" },
-  "rights": "{\"uid\":\"yamada\",\"isAdmin\":false,\"isSales\":true,\"isViewer\":false}",
-  "id": "/crm/user/yamada,1",
-  "link": [{ "___href": "/crm/user/yamada", "___rel": "self" }]
+  "userprofile": {
+    "display_name": "山田太郎",
+    "uid": "66004",
+    "is_admin": false,
+    "is_sales": true,
+    "is_viewer": false,
+    "email": "yamada@example.com"
+  },
+  "id": "/crm/user/66004,1",
+  "link": [{ "___href": "/crm/user/66004", "___rel": "self" }]
 }
 ```
 
-> `rights` は JSON 文字列。`JSON.parse()` してから使用する。
+> `uid`・`is_admin`・`is_sales`・`is_viewer`・`email` はサーバー側で付加する計算値（`email` は `/_user/{uid}` の `contributor[0].email`、ロールフラグは `isGroupMember` から取得）。PUT では送信しない。
 
 ---
 
@@ -239,16 +245,16 @@
 
 sales・viewer グループのメンバー UID 一覧を取得。
 
-**レスポンス**:
+**レスポンス**: `Entry[]`（`groupmembers` エンティティ、1 UID = 1 エントリ）
 ```json
-{
-  "feed": {
-    "entry": [{
-      "rights": "{\"sales\":[\"uid1\",\"uid2\"],\"viewer\":[\"uid3\"]}"
-    }]
-  }
-}
+[
+  { "groupmembers": { "group_name": "sales", "uid": "uid1" } },
+  { "groupmembers": { "group_name": "sales", "uid": "uid2" } },
+  { "groupmembers": { "group_name": "viewer", "uid": "uid3" } }
+]
 ```
+
+> グループメンバーが 0 人の場合は `null` を返す。`normalizeEntries()` で正規化して使用する。
 
 ---
 

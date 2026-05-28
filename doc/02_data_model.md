@@ -8,7 +8,8 @@
 | 顧客担当者 | `contact` | `/crm/customer/{cid}/contact/{ctid}` | 顧客側の担当者（人物） |
 | 商談 | `deal` | `/crm/deal/{did}` | 顧客との商談・案件 |
 | 対応履歴 | `activity` | `/crm/customer/{cid}/activity/{aid}` | 顧客への対応記録 |
-| ユーザープロフィール | `userprofile` | `/crm/user/{uid}` | CRM利用者の表示名 |
+| ユーザープロフィール | `userprofile` | `/crm/user/{uid}` | CRM利用者のプロフィール・ロール情報 |
+| グループメンバー | `groupmembers` | —（API レスポンスのみ） | ロール別UID一覧（管理画面向け集計） |
 
 ---
 
@@ -147,9 +148,28 @@ deal/activity ──> contact        ← contact_uri フィールドで参照（
 
 ### userprofile（ユーザープロフィール）
 
+| フィールド | 型 | 必須 | 最大 | 説明 | 保存 |
+|---|---|:---:|---:|---|:---:|
+| `display_name` | string | ✓ | 100 | 表示名（顧客詳細・商談画面に表示） | ✓ |
+| `uid` | string | | 255 | vte.cx UID（GETレスポンス時にセット） | — |
+| `is_admin` | boolean | | — | 管理者ロールフラグ（GETレスポンス時にセット） | — |
+| `is_sales` | boolean | | — | 営業担当者ロールフラグ（GETレスポンス時にセット） | — |
+| `is_viewer` | boolean | | — | 閲覧者ロールフラグ（GETレスポンス時にセット） | — |
+| `email` | string | | 255 | ログインメールアドレス（`/_user/{uid}` の `contributor[0].email` から取得） | — |
+
+> **保存欄が — のフィールド**は `/api/crm/user/me` の GET レスポンス時にサーバーサイドで付加される計算値。  
+> `/crm/user/{uid}` には保存されない。PUT 時は `display_name` のみ送信する。
+
+---
+
+### groupmembers（グループメンバー）
+
 | フィールド | 型 | 必須 | 最大 | 説明 |
 |---|---|:---:|---:|---|
-| `display_name` | string | ✓ | 100 | 表示名（顧客詳細・商談画面に表示） |
+| `group_name` | string | ✓ | 100 | グループ名（`sales` / `viewer`） |
+| `uid` | string | ✓ | 255 | メンバーの vte.cx UID |
+
+> `GET /api/admin/groups` のレスポンス専用エンティティ。`/_group/sales`・`/_group/viewer` のメンバーを集計した結果をエントリ配列として返す。データの永続化には使用しない。
 
 ---
 
