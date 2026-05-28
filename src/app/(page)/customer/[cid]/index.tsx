@@ -16,13 +16,16 @@ import {
   CrmEntry, ContactEntity, ActivityEntity,
   CUSTOMER_STATUS_LABEL, CustomerStatus,
   ACTIVITY_TYPE, ACTIVITY_TYPE_LABEL, ActivityType,
+  DEAL_STAGE_LABEL, DealStage,
   extractIdFromUri,
 } from '@/typings/crm'
 import {
-  fetchCustomer, deleteCustomer,
+  fetchCustomer, updateCustomer, deleteCustomer,
   fetchContacts, createContact, updateContact, deleteContact,
   fetchActivities, createActivity, updateActivity, deleteActivity,
 } from '../fetcher'
+import { fetchDealsByCustomer } from '@/app/(page)/deal/fetcher'
+import { fetchUsers, UserRow } from '@/app/(page)/admin/users/fetcher'
 import * as browserutil from '@/utils/browserutil'
 import Loader from '@/components/loader'
 
@@ -41,26 +44,38 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<CrmEntry | null>(null)
   const [contacts, setContacts] = useState<CrmEntry[]>([])
   const [activities, setActivities] = useState<CrmEntry[]>([])
+  const [deals, setDeals] = useState<CrmEntry[]>([])
+  const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
   const [tab, setTab] = useState(0)
 
+  const [assignEditing, setAssignEditing] = useState(false)
+  const [assignedUid, setAssignedUid] = useState('')
+  const [assignSaving, setAssignSaving] = useState(false)
+
   const [contactDialog, setContactDialog] = useState<{ open: boolean; entry?: CrmEntry }>({ open: false })
   const [contactForm, setContactForm] = useState<ContactEntity>(emptyContact)
+  const [selectedContactUid, setSelectedContactUid] = useState('')
   const [activityDialog, setActivityDialog] = useState<{ open: boolean; entry?: CrmEntry }>({ open: false })
   const [activityForm, setActivityForm] = useState<ActivityEntity>(emptyActivity)
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
     try {
-      const [c, ct, ac] = await Promise.all([
+      const [c, ct, ac, dl, userList] = await Promise.all([
         fetchCustomer(cid),
         fetchContacts(cid),
         fetchActivities(cid),
+        fetchDealsByCustomer(cid),
+        fetchUsers(),
       ])
       setCustomer(c)
       setContacts(ct)
       setActivities(ac)
+      setDeals(dl)
+      setUsers(userList)
+      setAssignedUid(c?.customer?.assigned_uid ?? '')
     } catch (e: any) {
       setError(browserutil.handleError(e).error.message)
     } finally {
@@ -69,6 +84,19 @@ export default function CustomerDetailPage() {
   }, [cid])
 
   useEffect(() => { load() }, [load])
+
+  const handleSaveAssignedUid = async () => {
+    setAssignSaving(true)
+    try {
+      await updateCustomer(cid, { ...customer?.customer, assigned_uid: assignedUid || undefined })
+      setCustomer((prev) => prev ? { ...prev, customer: { ...prev.customer, assigned_uid: assignedUid || undefined } } : prev)
+      setAssignEditing(false)
+    } catch (e: any) {
+      setError(browserutil.handleError(e).error.message)
+    } finally {
+      setAssignSaving(false)
+    }
+  }
 
   const handleDeleteCustomer = async () => {
     if (!confirm('この顧客を削除しますか？')) return
@@ -80,8 +108,27 @@ export default function CustomerDetailPage() {
     }
   }
 
+  const handleContactUserSelect = (uid: string) => {
+    setSelectedContactUid(uid)
+    const user = users.find((u) => u.uid === uid)
+    if (!user) return
+    setContactForm((p) => ({
+      ...p,
+      family_name: user.family_name ?? '',
+      given_name: user.given_name ?? '',
+      family_name_kana: user.family_name_kana,
+      given_name_kana: user.given_name_kana,
+      department: user.department,
+      title: user.title,
+      email: user.email,
+      phone: user.phone,
+      mobile: user.mobile,
+    }))
+  }
+
   const openContactDialog = (entry?: CrmEntry) => {
     setContactForm(entry?.contact ?? emptyContact)
+    setSelectedContactUid('')
     setContactDialog({ open: true, entry })
   }
   const handleSaveContact = async () => {
@@ -157,6 +204,9 @@ export default function CustomerDetailPage() {
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <IconButton onClick={() => router.push('/customer')}><ArrowBackIcon /></IconButton>
           <Typography variant="h5" flex={1}>{c?.name ?? '—'}</Typography>
+          <Button startIcon={<AddIcon />} onClick={() => router.push(`/deal/new?customer=${cid}`)}>
+            商談登録
+          </Button>
           <Button startIcon={<EditIcon />} onClick={() => router.push(`/customer/${cid}/edit`)}>
             編集
           </Button>
@@ -190,8 +240,40 @@ export default function CustomerDetailPage() {
               <Typography>{c?.address ?? '—'}</Typography>
             </Grid>
             <Grid item xs={12} sm={6}>
-              <Typography variant="caption" color="text.secondary">担当者UID</Typography>
-              <Typography>{c?.assigned_uid ?? '—'}</Typography>
+              <Typography variant="caption" color="text.secondary">担当者</Typography>
+              {assignEditing ? (
+                <Box display="flex" gap={1} alignItems="center" mt={0.5}>
+                  <FormControl size="small" sx={{ minWidth: 160 }}>
+                    <Select
+                      value={assignedUid}
+                      onChange={(e) => setAssignedUid(e.target.value)}
+                      displayEmpty
+                    >
+                      <MenuItem value="">（未割り当て）</MenuItem>
+                      {users.map((u) => (
+                        <MenuItem key={u.uid} value={u.uid}>
+                          {u.display_name ?? u.uid}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <Button size="small" variant="contained" onClick={handleSaveAssignedUid} disabled={assignSaving}>
+                    {assignSaving ? '保存中' : '保存'}
+                  </Button>
+                  <Button size="small" onClick={() => { setAssignedUid(c?.assigned_uid ?? ''); setAssignEditing(false) }}>
+                    取消
+                  </Button>
+                </Box>
+              ) : (
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <Typography>
+                    {users.find((u) => u.uid === c?.assigned_uid)?.display_name ?? c?.assigned_uid ?? '—'}
+                  </Typography>
+                  <IconButton size="small" onClick={() => setAssignEditing(true)}>
+                    <EditIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              )}
             </Grid>
             {c?.memo && (
               <Grid item xs={12}>
@@ -206,6 +288,7 @@ export default function CustomerDetailPage() {
         <Tabs value={tab} onChange={(_, v) => setTab(v)}>
           <Tab label={`担当者 (${contacts.length})`} />
           <Tab label={`対応履歴 (${activities.length})`} />
+          <Tab label={`商談 (${deals.length})`} />
         </Tabs>
         <Divider />
 
@@ -292,11 +375,65 @@ export default function CustomerDetailPage() {
           </Stack>
         </TabPanel>
 
+        {/* 商談タブ */}
+        <TabPanel value={tab} index={2}>
+          <Box display="flex" justifyContent="flex-end" mb={1}>
+            <Button startIcon={<AddIcon />} size="small" onClick={() => router.push(`/deal/new?customer=${cid}`)}>
+              商談登録
+            </Button>
+          </Box>
+          <TableContainer component={Paper}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>商談名</TableCell>
+                  <TableCell>フェーズ</TableCell>
+                  <TableCell align="right">金額（円）</TableCell>
+                  <TableCell>予定クローズ日</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {deals.length === 0 ? (
+                  <TableRow><TableCell colSpan={4} align="center">商談がありません</TableCell></TableRow>
+                ) : deals.map((entry) => {
+                  const d = entry.deal!
+                  const did = extractIdFromUri(entry.link?.find((l) => l.___rel === 'self')?.___href)
+                  return (
+                    <TableRow key={entry.id} hover sx={{ cursor: 'pointer' }} onClick={() => router.push(`/deal/${did}`)}>
+                      <TableCell>{d.name}</TableCell>
+                      <TableCell>
+                        <Chip size="small" label={DEAL_STAGE_LABEL[d.stage as DealStage] ?? d.stage} />
+                      </TableCell>
+                      <TableCell align="right">{d.amount != null ? d.amount.toLocaleString() : '—'}</TableCell>
+                      <TableCell>{d.expected_close_date ?? '—'}</TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TabPanel>
+
         {/* 担当者ダイアログ */}
         <Dialog open={contactDialog.open} onClose={() => setContactDialog({ open: false })} maxWidth="sm" fullWidth>
           <DialogTitle>{contactDialog.entry ? '担当者編集' : '担当者追加'}</DialogTitle>
           <DialogContent>
             <Stack spacing={2} mt={1}>
+              {!contactDialog.entry && (
+                <FormControl fullWidth required>
+                  <InputLabel>ユーザー</InputLabel>
+                  <Select
+                    value={selectedContactUid}
+                    label="ユーザー"
+                    onChange={(e) => handleContactUserSelect(e.target.value)}
+                  >
+                    <MenuItem value="">選択してください</MenuItem>
+                    {users.map((u) => (
+                      <MenuItem key={u.uid} value={u.uid}>{u.display_name ?? u.uid}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
               <Box display="flex" gap={2}>
                 <TextField label="姓" required value={contactForm.family_name ?? ''} onChange={(e) => setContactForm((p) => ({ ...p, family_name: e.target.value }))} fullWidth />
                 <TextField label="名" required value={contactForm.given_name ?? ''} onChange={(e) => setContactForm((p) => ({ ...p, given_name: e.target.value }))} fullWidth />

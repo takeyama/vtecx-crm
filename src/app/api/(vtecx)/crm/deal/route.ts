@@ -8,6 +8,12 @@ export const GET = async (req: NextRequest): Promise<Response> => {
   if (check) return check
 
   try {
+    const customer = vtecxnext.getParameter('customer')
+    if (customer) {
+      const customerUri = encodeURIComponent(`/crm/customer/${customer}`)
+      const feed = await vtecxnext.getFeed(`/crm/deal?customer_uri=${customerUri}`)
+      return vtecxnext.response(200, feed ?? null)
+    }
     const n = parseInt(vtecxnext.getParameter('n') ?? '1', 10)
     const entries = await vtecxnext.getPageWithPagination('/crm/deal?l=50', n)
     return vtecxnext.response(200, entries ?? null)

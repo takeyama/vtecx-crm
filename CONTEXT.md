@@ -40,7 +40,7 @@
 return vtecxnext.response(200, entries ?? null)
 // クライアントが受け取るのは: [ { id: "...", customer: {...} }, ... ]
 // ❌NG: data?.feed?.entry でアクセスしてはいけない
-// ✅OK: data が直接配列なので normalizeEntries(data) で正規化する
+// ✅OK: Array.isArray(data) ? data : [] で安全に配列化する
 ```
 
 `{ feed: { title: ... } }` 形式で返したい場合のみ明示的にラップする：
@@ -51,28 +51,30 @@ return vtecxnext.response(200, { feed: { title: uri } })
 
 ### データ取得メソッドの戻り値
 
-| メソッド | 戻り値の型 | フロントでの受け取り方 |
+| メソッド | 戻り値の型 | データなし時（204相当） |
 |---|---|---|
-| `getPageWithPagination(uri, n)` | `Entry[]` または `undefined` | `normalizeEntries(data)` |
-| `getFeed(uri)` | `Entry`（1件）または `Entry[]`（2件以上） | `normalizeEntries(data)` |
-| `getEntry(uri)` | `Entry`（単一オブジェクト） | `normalizeEntries(data)[0]` |
+| `getPageWithPagination(uri, n)` | `Entry[]` | `undefined` |
+| `getFeed(uri)` | `Entry[]` | `null` / `undefined` |
+| `getEntry(uri)` | `Entry`（単一オブジェクト） | `null` / `undefined` |
 
-> **`getFeed` は件数で型が変わる**（1件=object, 2件以上=array）。`normalizeEntries()` で必ず正規化する。
+> **`getFeed` / `getPageWithPagination` は常に `Entry[]` を返す**（件数による型変化なし）。  
+> `vtecxnext.response(200, null)` は 204 でなく **200 + null ボディ**を返すため、フロントで null チェックが必要。
 
-### normalizeEntries の正しい使い方
+### フロントエンドでのリスト正規化パターン
 
 ```typescript
-// src/typings/crm.ts に定義済み
-export const normalizeEntries = (entry: any): CrmEntry[] => {
-  if (!entry) return []
-  return Array.isArray(entry) ? entry : [entry]
-}
+// ✅ 正しいパターン（null / 非配列を安全に空配列へ）
+const data = await browserutil.requestApi('GET', 'crm/customer', `n=${n}`)
+return Array.isArray(data) ? data as CrmEntry[] : []
 
-// ✅ 正しい呼び方（API Route が配列を直接返すため）
+// ✅ filter もセットで
+return (Array.isArray(data) ? data as CrmEntry[] : []).filter((e) => !e.customer?.is_deleted)
+
+// ❌ ?? [] だけでは不十分（オブジェクト {} が来たとき filter でエラー）
+return (data as CrmEntry[]) ?? []
+
+// ❌ normalizeEntries は削除済み（crm.ts から除去）
 const entries = normalizeEntries(data)
-
-// ❌ 誤った呼び方（feed ラッパーは存在しない）
-const entries = normalizeEntries(data?.feed?.entry)
 ```
 
 ### entry.id の形式
@@ -109,6 +111,35 @@ export const GET = async (req: NextRequest): Promise<Response> => {
 ```typescript
 const id = String(Date.now()).padStart(13, '0')  // "1748345678901"
 const uri = `/crm/customer/${id}`
+```
+
+### ⚠️ 動的子パスの事前登録（必須）
+
+`/crm/customer/{cid}/contact/{ctid}` へ PUT するには、**親パス `/crm/customer/{cid}/contact` が vte.cx に登録済みでなければならない**。
+
+```typescript
+// ✅ 顧客作成時に子パスを同時登録する
+await vtecxnext.put({ feed: { entry: [customerEntry] } })
+await Promise.all([
+  vtecxnext.put({ feed: { entry: [{ link: [{ ___rel: 'self', ___href: `${uri}/contact` }], contributor }] } }),
+  vtecxnext.put({ feed: { entry: [{ link: [{ ___rel: 'self', ___href: `${uri}/activity` }], contributor }] } }),
+])
+```
+
+既存データ等で登録漏れが起きた場合は **"Parent path is required"** エラーになる。  
+その場合は親パスを登録してからリトライする：
+
+```typescript
+try {
+  await vtecxnext.put({ feed: { entry: [entry] } })
+} catch (e) {
+  if (isVtecxNextError(e) && e.message.includes('Parent path is required')) {
+    await vtecxnext.put({ feed: { entry: [{ link: [{ ___rel: 'self', ___href: parentPath }], contributor }] } })
+    await vtecxnext.put({ feed: { entry: [entry] } })
+  } else {
+    throw e
+  }
+}
 ```
 
 ### 論理削除パターン
@@ -209,7 +240,7 @@ src/
 │   ├── (page)/
 │   │   ├── customer/                   顧客一覧・詳細・登録・編集
 │   │   ├── deal/                       商談一覧・詳細・登録・編集
-│   │   ├── settings/                   ユーザー設定（表示名・ロール確認）
+│   │   ├── settings/                   ユーザー設定（プロフィール編集・ロール確認）
 │   │   ├── admin/users/                ユーザー管理（管理者専用）
 │   │   ├── setup/                      初回表示名設定（未設定ユーザー用）
 │   │   └── pending/                    権限付与待ち（未割り当てユーザー用）
@@ -226,7 +257,7 @@ src/
 ├── hooks/
 │   └── useAuthGuard.ts                 認証ガード（display_name・ロールチェック）
 └── typings/
-    └── crm.ts                          CRMエンティティ型 + normalizeEntries()
+    └── crm.ts                          CRMエンティティ型・定数・ユーティリティ関数
 ```
 
 ---
@@ -268,7 +299,11 @@ contributor: [
 
 | ミス | 正しい実装 |
 |---|---|
-| `normalizeEntries(data?.feed?.entry)` | `normalizeEntries(data)` |
+| `normalizeEntries(data)` を使う | `normalizeEntries` は削除済み。`Array.isArray(data) ? data : []` を使う |
+| `(data as CrmEntry[]) ?? []` でリスト取得 | `?? []` は `{}` 等のオブジェクトを通過させる。`Array.isArray` チェックが必要 |
+| `data?.feed?.entry` でエントリにアクセス | API Route は feed ラッパーなしで直接配列を返す |
+| 顧客作成後に子パス（`/contact`・`/activity`）を登録しない | 顧客 POST と同時に `Promise.all` で子パスを登録する |
+| contact/activity を PUT して "Parent path is required" が出たまま | 親パスを PUT で登録してからリトライする |
 | `fetchCustomers` を外側コンポーネントの `useEffect` に書く | 内側コンポーネントに移動する |
 | 更新時に `contributor` を省略する | `existing?.contributor` を必ず引き継ぐ |
 | `entry.id` から `,` 以降を含めたままパス操作する | `entry.id.split(',')[0]` でパス部分のみ取り出す |

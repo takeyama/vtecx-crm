@@ -1,9 +1,18 @@
 import * as browserutil from '@/utils/browserutil'
-import { normalizeEntries } from '@/typings/crm'
+import { CrmEntry } from '@/typings/crm'
 
 export interface UserRow {
   uid: string
   display_name?: string
+  family_name?: string
+  given_name?: string
+  family_name_kana?: string
+  given_name_kana?: string
+  department?: string
+  title?: string
+  email?: string
+  phone?: string
+  mobile?: string
   isSales: boolean
   isViewer: boolean
 }
@@ -14,8 +23,8 @@ export const fetchUsers = async (): Promise<UserRow[]> => {
     browserutil.requestApi('GET', 'admin/groups', '').catch(() => null),
   ])
 
-  const entries = profileData ? normalizeEntries(profileData) : []
-  const groupEntries = groupData ? normalizeEntries(groupData) : []
+  const entries = Array.isArray(profileData) ? profileData as CrmEntry[] : []
+  const groupEntries = Array.isArray(groupData) ? groupData as CrmEntry[] : []
   const salesUids = new Set(
     groupEntries
       .filter((e) => e.groupmembers?.group_name === 'sales')
@@ -31,9 +40,19 @@ export const fetchUsers = async (): Promise<UserRow[]> => {
 
   return entries.map((e) => {
     const uid: string = e.link?.find((l: any) => l.___rel === 'self')?.___href?.split('/').pop() ?? ''
+    const up = e.userprofile
     return {
       uid,
-      display_name: e.userprofile?.display_name,
+      display_name: up?.display_name,
+      family_name: up?.family_name,
+      given_name: up?.given_name,
+      family_name_kana: up?.family_name_kana,
+      given_name_kana: up?.given_name_kana,
+      department: up?.department,
+      title: up?.title,
+      email: up?.email,
+      phone: up?.phone,
+      mobile: up?.mobile,
       isSales: salesUids.has(uid),
       isViewer: viewerUids.has(uid),
     }

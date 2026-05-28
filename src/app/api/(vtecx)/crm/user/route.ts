@@ -9,7 +9,19 @@ export const GET = async (req: NextRequest): Promise<Response> => {
 
   try {
     const feed = await vtecxnext.getFeed('/crm/user')
-    return vtecxnext.response(200, feed ?? null)
+    if (!feed) return vtecxnext.response(200, null)
+
+    const entries = Array.isArray(feed) ? feed : [feed]
+    const entriesWithEmail = await Promise.all(
+      entries.map(async (entry: any) => {
+        const uid = entry.link?.find((l: any) => l.___rel === 'self')?.___href?.split('/').pop()
+        if (!uid) return entry
+        const userEntry = await vtecxnext.getEntry(`/_user/${uid}`).catch(() => null)
+        const email = (userEntry as any)?.contributor?.[0]?.email ?? entry.userprofile?.email
+        return { ...entry, userprofile: { ...entry.userprofile, email } }
+      })
+    )
+    return vtecxnext.response(200, entriesWithEmail)
   } catch (e) {
     if (isVtecxNextError(e)) return vtecxnext.response(e.status, { feed: { title: e.message } })
     return vtecxnext.response(503, { feed: { title: 'Error occurred.' } })

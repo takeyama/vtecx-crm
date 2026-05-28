@@ -69,6 +69,14 @@ export interface UserProfileEntity {
   is_sales?: boolean
   is_viewer?: boolean
   email?: string
+  family_name?: string
+  given_name?: string
+  family_name_kana?: string
+  given_name_kana?: string
+  department?: string
+  title?: string
+  phone?: string
+  mobile?: string
 }
 
 export interface GroupmembersEntity {
@@ -148,8 +156,3 @@ export const getSelfHref = (entry: CrmEntry): string => {
   return entry.link?.find((l) => l.___rel === 'self')?.___href ?? ''
 }
 
-/** Entry配列の正規化（1件はオブジェクト、2件以上は配列） */
-export const normalizeEntries = (entry: any): CrmEntry[] => {
-  if (!entry) return []
-  return Array.isArray(entry) ? entry : [entry]
-}

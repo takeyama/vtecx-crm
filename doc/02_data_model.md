@@ -151,6 +151,14 @@ deal/activity ──> contact        ← contact_uri フィールドで参照（
 | フィールド | 型 | 必須 | 最大 | 説明 | 保存 |
 |---|---|:---:|---:|---|:---:|
 | `display_name` | string | ✓ | 100 | 表示名（顧客詳細・商談画面に表示） | ✓ |
+| `family_name` | string | | 100 | 姓 | ✓ |
+| `given_name` | string | | 100 | 名 | ✓ |
+| `family_name_kana` | string | | 100 | 姓カナ | ✓ |
+| `given_name_kana` | string | | 100 | 名カナ | ✓ |
+| `department` | string | | 200 | 部署 | ✓ |
+| `title` | string | | 100 | 役職 | ✓ |
+| `phone` | string | | 20 | 電話番号 | ✓ |
+| `mobile` | string | | 20 | 携帯番号 | ✓ |
 | `uid` | string | | 255 | vte.cx UID（GETレスポンス時にセット） | — |
 | `is_admin` | boolean | | — | 管理者ロールフラグ（GETレスポンス時にセット） | — |
 | `is_sales` | boolean | | — | 営業担当者ロールフラグ（GETレスポンス時にセット） | — |
@@ -158,7 +166,8 @@ deal/activity ──> contact        ← contact_uri フィールドで参照（
 | `email` | string | | 255 | ログインメールアドレス（`/_user/{uid}` の `contributor[0].email` から取得） | — |
 
 > **保存欄が — のフィールド**は `/api/crm/user/me` の GET レスポンス時にサーバーサイドで付加される計算値。  
-> `/crm/user/{uid}` には保存されない。PUT 時は `display_name` のみ送信する。
+> `/crm/user/{uid}` には保存されない。  
+> `userprofile` の保存フィールド（`display_name` 〜 `mobile`）は `contact` エンティティと共通項目であり、ユーザーが設定画面で登録した情報が顧客担当者の登録時に自動補完される。
 
 ---
 

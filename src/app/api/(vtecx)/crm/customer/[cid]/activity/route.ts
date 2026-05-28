@@ -31,17 +31,27 @@ export const POST = async (req: NextRequest, { params }: Params): Promise<Respon
     const id = String(Date.now()).padStart(13, '0')
     const uri = `/crm/customer/${cid}/activity/${id}`
 
+    const contributor = [
+      { uri: 'urn:vte.cx:acl:/_group/$admin,CURD' },
+      { uri: `urn:vte.cx:acl:${uid},CURD` },
+      { uri: 'urn:vte.cx:acl:/_group/sales,RE' },
+      { uri: 'urn:vte.cx:acl:/_group/viewer,RE' },
+    ]
     const entry: any = {
       link: [{ ___rel: 'self', ___href: uri }],
       activity: { ...body.activity, created_uid: uid },
-      contributor: [
-        { uri: 'urn:vte.cx:acl:/_group/$admin,CURD' },
-        { uri: `urn:vte.cx:acl:${uid},CURD` },
-        { uri: 'urn:vte.cx:acl:/_group/sales,RE' },
-        { uri: 'urn:vte.cx:acl:/_group/viewer,RE' },
-      ],
+      contributor,
     }
-    await vtecxnext.put({ feed: { entry: [entry] } })
+    try {
+      await vtecxnext.put({ feed: { entry: [entry] } })
+    } catch (e) {
+      if (isVtecxNextError(e) && e.message.includes('Parent path is required')) {
+        await vtecxnext.put({ feed: { entry: [{ link: [{ ___rel: 'self', ___href: `/crm/customer/${cid}/activity` }], contributor }] } })
+        await vtecxnext.put({ feed: { entry: [entry] } })
+      } else {
+        throw e
+      }
+    }
     return vtecxnext.response(200, { feed: { title: uri } })
   } catch (e) {
     if (isVtecxNextError(e)) return vtecxnext.response(e.status, { feed: { title: e.message } })

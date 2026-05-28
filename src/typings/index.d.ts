@@ -106,7 +106,15 @@ declare namespace VtecxApp {
 		is_admin?:boolean,
 		is_sales?:boolean,
 		is_viewer?:boolean,
-		email?:string
+		email?:string,
+		family_name?:string,
+		given_name?:string,
+		family_name_kana?:string,
+		given_name_kana?:string,
+		department?:string,
+		title?:string,
+		phone?:string,
+		mobile?:string
 	}
 	interface Groupmembers {
 		group_name?:string,

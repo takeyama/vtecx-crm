@@ -16,7 +16,7 @@ export const GET = async (req: NextRequest): Promise<Response> => {
 
     const toUids = (feed: any): string[] => {
       if (!feed) return []
-      const entries = Array.isArray(feed) ? feed : [feed]
+      const entries = feed ?? []
       return entries
         .map((e: any) => {
           const href: string = e?.link?.find((l: any) => l.___rel === 'self')?.___href ?? ''

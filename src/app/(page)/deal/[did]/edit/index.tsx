@@ -6,13 +6,15 @@ import { Alert, CircularProgress, Box } from '@mui/material'
 import Loader from '@/components/loader'
 import DealForm from '../../DealForm'
 import { fetchDeal, updateDeal } from '../../fetcher'
-import { DealEntity } from '@/typings/crm'
+import { CrmEntry, DealEntity } from '@/typings/crm'
+import { fetchAllCustomers } from '@/app/(page)/customer/fetcher'
 import * as browserutil from '@/utils/browserutil'
 
 export default function DealEditPage() {
   const router = useRouter()
   const { did } = useParams<{ did: string }>()
   const [initial, setInitial] = useState<DealEntity>()
+  const [customers, setCustomers] = useState<CrmEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>()
@@ -20,8 +22,9 @@ export default function DealEditPage() {
   useEffect(() => {
     ;(async () => {
       try {
-        const entry = await fetchDeal(did)
+        const [entry, cList] = await Promise.all([fetchDeal(did), fetchAllCustomers()])
         setInitial(entry?.deal ?? {})
+        setCustomers(cList)
       } catch (e: any) {
         setError(browserutil.handleError(e).error.message)
       } finally {
@@ -57,6 +60,7 @@ export default function DealEditPage() {
         <DealForm
           title="商談編集"
           initial={initial}
+          customers={customers}
           onSubmit={handleSubmit}
           onCancel={() => router.push(`/deal/${did}`)}
           loading={saving}
