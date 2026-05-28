@@ -1,5 +1,58 @@
 # vtecxnextblank
 
+## Claude Code（AI）での利用方法
+
+このリポジトリは vte.cx を使ったシステム開発の**実装リファレンス**です。  
+Claude Code などの AI に vte.cx の仕様・実装パターンを参照させることで、開発を効率化できます。
+
+### 方法 1: 自分のプロジェクトの CLAUDE.md に追記（推奨）
+
+新しいプロジェクトの `CLAUDE.md` に以下を追加してください。Claude Code が自動的に読み込みます。
+
+```markdown
+## vte.cx 仕様の参照先
+
+vte.cx BaaS の仕様（SDK の使い方・エンティティ・ACL・認証など）を確認する場合は、
+以下の実装リファレンスを参照すること。
+
+- 実装パターン・制約・よくあるミス: https://raw.githubusercontent.com/takeyama/vtecx-crm/main/CONTEXT.md
+- フレームワーク仕様（スキーマ・ACL・データ取得）: https://raw.githubusercontent.com/takeyama/vtecx-crm/main/README.md
+```
+
+### 方法 2: 会話中に URL を渡す
+
+```
+@https://raw.githubusercontent.com/takeyama/vtecx-crm/main/CONTEXT.md
+vte.cx で顧客管理APIを実装したい
+```
+
+### 方法 3: リポジトリをクローンして直接参照
+
+```bash
+# サブモジュールとして追加
+git submodule add https://github.com/takeyama/vtecx-crm .vtecx-reference
+```
+
+`CLAUDE.md` に以下を追記：
+
+```markdown
+vte.cx の仕様・実装パターンは .vtecx-reference/ を参照すること。
+```
+
+### 主な参照ファイル
+
+| ファイル | 内容 |
+| --- | --- |
+| [`CONTEXT.md`](CONTEXT.md) | AI向け地図。実装パターン・制約・よくあるミスを凝縮 |
+| [`README.md`](README.md) | vte.cx フレームワーク仕様（SDK・ACL・スキーマ・ページング） |
+| [`doc/02_data_model.md`](doc/02_data_model.md) | エンティティ定義・フィールド一覧・URI設計 |
+| [`doc/03_api.md`](doc/03_api.md) | API エンドポイント仕様 |
+| [`doc/04_screens.md`](doc/04_screens.md) | 画面仕様 |
+| [`setup/_settings/template.xml`](setup/_settings/template.xml) | スキーマ定義の具体例 |
+| [`setup/_settings/folderacls.json`](setup/_settings/folderacls.json) | ACL 設定の具体例 |
+
+---
+
 ## 参考リンク
 
 | リソース                     | URL                                                      |

@@ -1,0 +1,34 @@
+# vtecx-crm — vte.cx BaaS × Next.js App Router の CRM 実装リファレンス
+
+> vte.cx（https://vte.cx/）を使ったシステム開発の参考実装です。
+> SDK の使い方・データ設計・ACL・認証フローの具体的なコードを提供します。
+
+## 最重要ファイル
+
+- [CONTEXT.md](CONTEXT.md): AI向けコンテキスト。実装パターン・制約・よくあるミスをまとめた「地図」
+- [README.md](README.md): vte.cx フレームワーク仕様（スキーマ定義・ACL・データ取得・ページング等）
+
+## 仕様ドキュメント（doc/）
+
+- [doc/01_overview.md](doc/01_overview.md): システム概要・技術スタック・ロール定義
+- [doc/02_data_model.md](doc/02_data_model.md): エンティティ定義・フィールド一覧・URI設計
+- [doc/03_api.md](doc/03_api.md): API エンドポイント仕様（パラメータ・レスポンス形式）
+- [doc/04_screens.md](doc/04_screens.md): 画面仕様・ナビゲーション・コンポーネントパターン
+- [doc/05_auth_flow.md](doc/05_auth_flow.md): 認証・権限フロー
+
+## 実装ファイル（主要）
+
+- [setup/_settings/template.xml](setup/_settings/template.xml): vte.cx スキーマ定義（全エンティティ）
+- [setup/_settings/folderacls.json](setup/_settings/folderacls.json): パス別 ACL 設定
+- [src/typings/crm.ts](src/typings/crm.ts): CRM エンティティ TypeScript 型定義
+- [src/app/api/(vtecx)/crm/](src/app/api/(vtecx)/crm/): Next.js API Route 実装（CRUD パターン）
+- [src/app/(page)/](src/app/(page)/): フロントエンド画面実装
+
+## このプロジェクトが答えられること
+
+- vte.cx SDK（vtecxnext）の使い方
+- エンティティ・スキーマの設計方法（template.xml）
+- ACL（folderacls.json / contributor）の設定パターン
+- Next.js App Router × vte.cx の API Route 実装
+- 認証ガード・ロールベース制御の実装方法
+- ページング・検索・論理削除のパターン
