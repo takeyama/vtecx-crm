@@ -51,6 +51,8 @@ vte.cx の仕様・実装パターンは .vtecx-reference/ を参照すること
 | [`setup/_settings/template.xml`](setup/_settings/template.xml) | スキーマ定義の具体例 |
 | [`setup/_settings/folderacls.json`](setup/_settings/folderacls.json) | ACL 設定の具体例 |
 
+📖 **ドキュメントサイト**: https://takeyama.github.io/vtecx-crm/
+
 ---
 
 ## 参考リンク
