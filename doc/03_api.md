@@ -14,6 +14,7 @@
 | パラメータ | 型 | 必須 | 説明 |
 |---|---|:---:|---|
 | `n` | number | | ページ番号（デフォルト: 1）、1ページ25件 |
+| `all` | string | | `1` を指定すると全件取得（ページングなし）。商談フォームの顧客 Select 向け。 |
 
 **レスポンス**: `Entry[]`（直接配列）
 
@@ -39,7 +40,7 @@
 
 ### POST `/api/crm/customer`
 
-顧客を新規登録。
+顧客を新規登録。登録と同時に子パス（`/contact`・`/activity`）を `Promise.all` で並行登録する。
 
 **リクエストボディ**:
 ```json
@@ -83,7 +84,8 @@
 
 ### POST `/api/crm/customer/{cid}/contact`
 
-担当者を登録。URI は `Date.now()` で自動採番。
+担当者を登録。URI は `Date.now()` で自動採番。  
+親パス `/crm/customer/{cid}/contact` が未登録の場合（既存顧客等）、自動登録してからリトライする。
 
 **リクエストボディ**:
 ```json
@@ -116,7 +118,8 @@
 
 ### POST `/api/crm/customer/{cid}/activity`
 
-対応履歴を登録。`created_uid` はサーバー側でログインユーザーの UID を自動セット。
+対応履歴を登録。`created_uid` はサーバー側でログインユーザーの UID を自動セット。  
+親パス `/crm/customer/{cid}/activity` が未登録の場合、自動登録してからリトライする。
 
 **リクエストボディ**:
 ```json
@@ -148,11 +151,12 @@
 
 ### GET `/api/crm/deal`
 
-全商談一覧を取得（ページング付き）。
+商談一覧を取得。
 
 | パラメータ | 型 | 必須 | 説明 |
 |---|---|:---:|---|
-| `n` | number | | ページ番号（デフォルト: 1）、1ページ50件 |
+| `n` | number | | ページ番号（デフォルト: 1）、1ページ50件。`customer` 未指定時のみ有効 |
+| `customer` | string | | 顧客 cid を指定すると `customer_uri` でフィルタして全件返す（`getFeed` 使用）。顧客詳細の商談タブ向け。インデックス要 |
 
 **レスポンス**: `Entry[]`
 
@@ -203,33 +207,54 @@
 **レスポンス**:
 ```json
 {
-  "userprofile": { "display_name": "山田太郎" },
-  "rights": "{\"uid\":\"yamada\",\"isAdmin\":false,\"isSales\":true,\"isViewer\":false}",
-  "id": "/crm/user/yamada,1",
-  "link": [{ "___href": "/crm/user/yamada", "___rel": "self" }]
+  "userprofile": {
+    "display_name": "山田太郎",
+    "uid": "66004",
+    "is_admin": false,
+    "is_sales": true,
+    "is_viewer": false,
+    "email": "yamada@example.com"
+  },
+  "id": "/crm/user/66004,1",
+  "link": [{ "___href": "/crm/user/66004", "___rel": "self" }]
 }
 ```
 
-> `rights` は JSON 文字列。`JSON.parse()` してから使用する。
+> `uid`・`is_admin`・`is_sales`・`is_viewer`・`email` はサーバー側で付加する計算値（`email` は `/_user/{uid}` の `contributor[0].email`、ロールフラグは `isGroupMember` から取得）。PUT では送信しない。
 
 ---
 
 ### PUT `/api/crm/user/me`
 
-ログインユーザーのプロフィールを保存（初回は作成、以降は更新）。
+ログインユーザーのプロフィールを保存（初回は作成、以降は更新）。  
+保存時に `email`（ログインメールアドレス）も自動付加して永続化する。
 
 **リクエストボディ**:
 ```json
-{ "userprofile": { "display_name": "山田太郎" } }
+{
+  "userprofile": {
+    "display_name": "山田太郎",
+    "family_name": "山田",
+    "given_name": "太郎",
+    "family_name_kana": "ヤマダ",
+    "given_name_kana": "タロウ",
+    "department": "営業部",
+    "title": "課長",
+    "phone": "03-1234-5678",
+    "mobile": "090-1234-5678",
+    "email": "yamada@example.com"
+  }
+}
 ```
 
 ---
 
 ### GET `/api/crm/user`
 
-全ユーザープロフィール一覧を取得（管理者向け）。
+全ユーザープロフィール一覧を取得（担当者選択 Select 向け）。  
+各ユーザーの `email` は `/_user/{uid}` の `contributor[0].email` から `Promise.all` で並行取得して付加する。
 
-**レスポンス**: `Entry[]`
+**レスポンス**: `Entry[]`（`userprofile.email` 含む）
 
 ---
 
@@ -239,16 +264,16 @@
 
 sales・viewer グループのメンバー UID 一覧を取得。
 
-**レスポンス**:
+**レスポンス**: `Entry[]`（`groupmembers` エンティティ、1 UID = 1 エントリ）
 ```json
-{
-  "feed": {
-    "entry": [{
-      "rights": "{\"sales\":[\"uid1\",\"uid2\"],\"viewer\":[\"uid3\"]}"
-    }]
-  }
-}
+[
+  { "groupmembers": { "group_name": "sales", "uid": "uid1" } },
+  { "groupmembers": { "group_name": "sales", "uid": "uid2" } },
+  { "groupmembers": { "group_name": "viewer", "uid": "uid3" } }
+]
 ```
+
+> グループメンバーが 0 人の場合は `null` を返す。フロントエンドでは `Array.isArray(data) ? data : []` で正規化する。
 
 ---
 
@@ -277,7 +302,8 @@ sales・viewer グループのメンバー UID 一覧を取得。
 
 | HTTP | エンドポイント | SDK 関数 |
 |---|---|---|
-| GET 一覧 | `/crm/customer`, `/crm/deal` | `getPageWithPagination` |
+| GET 一覧 | `/crm/customer`, `/crm/deal`（ページング） | `getPageWithPagination` |
+| GET 全件 | `/crm/customer?all=1`, `/crm/deal?customer=...` | `getFeed` |
 | GET 詳細 | `/crm/customer/{cid}` など | `getEntry` |
 | GET 子リスト | `/crm/customer/{cid}/contact` など | `getFeed` |
 | POST/PUT/DELETE | すべての書き込み | `put` |
@@ -297,4 +323,4 @@ sales・viewer グループのメンバー UID 一覧を取得。
 | `Entry`（単一） | JSON オブジェクトとして返る（`feed` ラッパーなし） |
 | `{ feed: { title: ... } }` | 明示的にラップした場合のみ feed 構造になる |
 
-フロントエンドで `normalizeEntries(data)` を使うと、配列/単一オブジェクトどちらでも `Entry[]` に正規化できる。
+フロントエンドでは `Array.isArray(data) ? data : []` で null・非配列を安全に処理する。

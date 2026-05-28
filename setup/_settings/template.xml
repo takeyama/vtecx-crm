@@ -55,6 +55,22 @@ activity
  is_deleted(boolean)
 userprofile
  display_name(string){100}!
+ uid(string){255}
+ is_admin(boolean)
+ is_sales(boolean)
+ is_viewer(boolean)
+ email(string){255}
+ family_name(string){100}
+ given_name(string){100}
+ family_name_kana(string){100}
+ given_name_kana(string){100}
+ department(string){200}
+ title(string){100}
+ phone(string){20}
+ mobile(string){20}
+groupmembers
+ group_name(string){100}!
+ uid(string){255}!
 </content>
 <link href="/_settings/template" rel="self"></link>
 <rights></rights>

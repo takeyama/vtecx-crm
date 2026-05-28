@@ -5,7 +5,8 @@ import {
   Box, Button, FormControl, InputLabel, MenuItem, Select,
   TextField, Typography, Stack,
 } from '@mui/material'
-import { DealEntity, DEAL_STAGE, DEAL_STAGE_LABEL } from '@/typings/crm'
+import { CrmEntry, DealEntity, DEAL_STAGE, DEAL_STAGE_LABEL, extractIdFromUri, getSelfHref } from '@/typings/crm'
+import { fetchContacts } from '@/app/(page)/customer/fetcher'
 
 interface Props {
   initial?: DealEntity
@@ -13,23 +14,47 @@ interface Props {
   onCancel: () => void
   loading?: boolean
   title: string
-  defaultCustomerUri?: string
+  customers: CrmEntry[]
+  lockedCustomerUri?: string
 }
 
-export default function DealForm({ initial = {}, onSubmit, onCancel, loading, title, defaultCustomerUri }: Props) {
+export default function DealForm({ initial = {}, onSubmit, onCancel, loading, title, customers, lockedCustomerUri }: Props) {
   const [form, setForm] = React.useState<DealEntity>({
     stage: 'lead',
-    customer_uri: defaultCustomerUri ?? '',
+    customer_uri: lockedCustomerUri ?? '',
     ...initial,
   })
+  const [contacts, setContacts] = React.useState<CrmEntry[]>([])
+  const [contactsLoading, setContactsLoading] = React.useState(false)
+  const isFirstLoad = React.useRef(true)
 
   const set = (key: keyof DealEntity, value: any) =>
     setForm((prev) => ({ ...prev, [key]: value }))
+
+  React.useEffect(() => {
+    const cid = extractIdFromUri(form.customer_uri)
+    if (!cid) {
+      setContacts([])
+      return
+    }
+    if (!isFirstLoad.current) {
+      setForm((prev) => ({ ...prev, contact_uri: undefined }))
+    }
+    isFirstLoad.current = false
+    setContactsLoading(true)
+    fetchContacts(cid).then(setContacts).finally(() => setContactsLoading(false))
+  }, [form.customer_uri])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     await onSubmit(form)
   }
+
+  const lockedCustomerName = lockedCustomerUri
+    ? (customers.find((e) => getSelfHref(e) === lockedCustomerUri)?.customer?.name ?? lockedCustomerUri)
+    : ''
+
+  const contactDisabled = !form.customer_uri || contactsLoading
 
   return (
     <Box p={3} maxWidth={600}>
@@ -43,14 +68,55 @@ export default function DealForm({ initial = {}, onSubmit, onCancel, loading, ti
             onChange={(e) => set('name', e.target.value)}
             fullWidth
           />
-          <TextField
-            label="顧客URI"
-            required
-            value={form.customer_uri ?? ''}
-            onChange={(e) => set('customer_uri', e.target.value)}
-            fullWidth
-            helperText="例: /crm/customer/0000000000001"
-          />
+
+          {lockedCustomerUri ? (
+            <TextField
+              label="顧客"
+              value={lockedCustomerName}
+              disabled
+              fullWidth
+            />
+          ) : (
+            <FormControl fullWidth required>
+              <InputLabel>顧客</InputLabel>
+              <Select
+                value={form.customer_uri ?? ''}
+                label="顧客"
+                onChange={(e) => set('customer_uri', e.target.value)}
+              >
+                {customers.map((entry) => {
+                  const href = getSelfHref(entry)
+                  return (
+                    <MenuItem key={href} value={href}>
+                      {entry.customer?.name ?? href}
+                    </MenuItem>
+                  )
+                })}
+              </Select>
+            </FormControl>
+          )}
+
+          <FormControl fullWidth disabled={contactDisabled}>
+            <InputLabel>担当者</InputLabel>
+            <Select
+              value={form.contact_uri ?? ''}
+              label="担当者"
+              onChange={(e) => set('contact_uri', e.target.value || undefined)}
+            >
+              <MenuItem value="">（なし）</MenuItem>
+              {contacts.map((entry) => {
+                const href = getSelfHref(entry)
+                const ct = entry.contact
+                const name = `${ct?.family_name ?? ''} ${ct?.given_name ?? ''}`.trim()
+                return (
+                  <MenuItem key={href} value={href}>
+                    {name || href}
+                  </MenuItem>
+                )
+              })}
+            </Select>
+          </FormControl>
+
           <FormControl fullWidth>
             <InputLabel>フェーズ</InputLabel>
             <Select
@@ -85,12 +151,6 @@ export default function DealForm({ initial = {}, onSubmit, onCancel, loading, ti
             onChange={(e) => set('expected_close_date', e.target.value)}
             fullWidth
             slotProps={{ inputLabel: { shrink: true } }}
-          />
-          <TextField
-            label="担当者UID"
-            value={form.assigned_uid ?? ''}
-            onChange={(e) => set('assigned_uid', e.target.value)}
-            fullWidth
           />
           <TextField
             label="メモ"

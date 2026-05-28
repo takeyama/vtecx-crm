@@ -103,12 +103,6 @@ export default function CustomerForm({ initial = {}, onSubmit, onCancel, loading
             fullWidth
           />
           <TextField
-            label="担当者UID"
-            value={form.assigned_uid ?? ''}
-            onChange={(e) => set('assigned_uid', e.target.value)}
-            fullWidth
-          />
-          <TextField
             label="メモ"
             value={form.memo ?? ''}
             onChange={(e) => set('memo', e.target.value)}

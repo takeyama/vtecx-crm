@@ -17,7 +17,17 @@ const ROLE_LABEL: Record<string, string> = {
 
 function SettingsContent() {
   const [info, setInfo] = useState<MyInfo | null>(null)
-  const [displayName, setDisplayName] = useState('')
+  const [form, setForm] = useState({
+    display_name: '',
+    family_name: '',
+    given_name: '',
+    family_name_kana: '',
+    given_name_kana: '',
+    department: '',
+    title: '',
+    phone: '',
+    mobile: '',
+  })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -28,7 +38,17 @@ function SettingsContent() {
       try {
         const data = await fetchMyInfo()
         setInfo(data)
-        setDisplayName(data.display_name ?? '')
+        setForm({
+          display_name: data.display_name ?? '',
+          family_name: data.family_name ?? '',
+          given_name: data.given_name ?? '',
+          family_name_kana: data.family_name_kana ?? '',
+          given_name_kana: data.given_name_kana ?? '',
+          department: data.department ?? '',
+          title: data.title ?? '',
+          phone: data.phone ?? '',
+          mobile: data.mobile ?? '',
+        })
       } catch (e: any) {
         setError(browserutil.handleError(e).error.message)
       } finally {
@@ -37,12 +57,26 @@ function SettingsContent() {
     })()
   }, [])
 
+  const set = (key: keyof typeof form, value: string) =>
+    setForm((prev) => ({ ...prev, [key]: value }))
+
   const handleSave = async () => {
     setSaving(true)
     setSuccess(false)
     setError(undefined)
     try {
-      await saveMyProfile({ display_name: displayName })
+      await saveMyProfile({
+        display_name: form.display_name,
+        family_name: form.family_name || undefined,
+        given_name: form.given_name || undefined,
+        family_name_kana: form.family_name_kana || undefined,
+        given_name_kana: form.given_name_kana || undefined,
+        department: form.department || undefined,
+        title: form.title || undefined,
+        phone: form.phone || undefined,
+        mobile: form.mobile || undefined,
+        email: info?.email || undefined,
+      })
       setSuccess(true)
     } catch (e: any) {
       setError(browserutil.handleError(e).error.message)
@@ -79,6 +113,10 @@ function SettingsContent() {
             <Typography fontFamily="monospace">{info?.uid ?? '—'}</Typography>
           </Box>
           <Box>
+            <Typography variant="caption" color="text.secondary">メールアドレス</Typography>
+            <Typography>{info?.email ?? '—'}</Typography>
+          </Box>
+          <Box>
             <Typography variant="caption" color="text.secondary">権限</Typography>
             <Box display="flex" gap={1} mt={0.5} flexWrap="wrap">
               {roles.length > 0 ? (
@@ -94,22 +132,35 @@ function SettingsContent() {
 
         <Divider sx={{ my: 2 }} />
 
-        {/* 表示名設定 */}
+        {/* プロフィール */}
         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
           プロフィール
         </Typography>
         <Stack spacing={2}>
           <TextField
             label="表示名"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
+            required
+            value={form.display_name}
+            onChange={(e) => set('display_name', e.target.value)}
             fullWidth
             helperText="顧客詳細や商談画面に表示される名前です"
           />
+          <Box display="flex" gap={2}>
+            <TextField label="姓" value={form.family_name} onChange={(e) => set('family_name', e.target.value)} fullWidth />
+            <TextField label="名" value={form.given_name} onChange={(e) => set('given_name', e.target.value)} fullWidth />
+          </Box>
+          <Box display="flex" gap={2}>
+            <TextField label="姓カナ" value={form.family_name_kana} onChange={(e) => set('family_name_kana', e.target.value)} fullWidth />
+            <TextField label="名カナ" value={form.given_name_kana} onChange={(e) => set('given_name_kana', e.target.value)} fullWidth />
+          </Box>
+          <TextField label="部署" value={form.department} onChange={(e) => set('department', e.target.value)} fullWidth />
+          <TextField label="役職" value={form.title} onChange={(e) => set('title', e.target.value)} fullWidth />
+          <TextField label="電話番号" value={form.phone} onChange={(e) => set('phone', e.target.value)} fullWidth />
+          <TextField label="携帯番号" value={form.mobile} onChange={(e) => set('mobile', e.target.value)} fullWidth />
           <Button
             variant="contained"
             onClick={handleSave}
-            disabled={saving || !displayName.trim()}
+            disabled={saving || !form.display_name.trim()}
           >
             {saving ? '保存中...' : '保存'}
           </Button>

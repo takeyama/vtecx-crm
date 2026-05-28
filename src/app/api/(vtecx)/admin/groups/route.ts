@@ -16,7 +16,7 @@ export const GET = async (req: NextRequest): Promise<Response> => {
 
     const toUids = (feed: any): string[] => {
       if (!feed) return []
-      const entries = Array.isArray(feed) ? feed : [feed]
+      const entries = feed ?? []
       return entries
         .map((e: any) => {
           const href: string = e?.link?.find((l: any) => l.___rel === 'self')?.___href ?? ''
@@ -25,18 +25,13 @@ export const GET = async (req: NextRequest): Promise<Response> => {
         .filter(Boolean)
     }
 
-    return vtecxnext.response(200, {
-      feed: {
-        entry: [
-          {
-            rights: JSON.stringify({
-              sales: toUids(salesFeed),
-              viewer: toUids(viewerFeed),
-            }),
-          },
-        ],
-      },
-    })
+    const salesUids = toUids(salesFeed)
+    const viewerUids = toUids(viewerFeed)
+    const entries = [
+      ...salesUids.map((uid) => ({ groupmembers: { group_name: 'sales', uid } })),
+      ...viewerUids.map((uid) => ({ groupmembers: { group_name: 'viewer', uid } })),
+    ]
+    return vtecxnext.response(200, entries.length > 0 ? entries : null)
   } catch (e) {
     if (isVtecxNextError(e)) return vtecxnext.response(e.status, { feed: { title: e.message } })
     return vtecxnext.response(503, { feed: { title: 'Error occurred.' } })

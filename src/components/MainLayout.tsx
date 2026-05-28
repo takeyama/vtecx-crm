@@ -12,10 +12,12 @@ import PeopleIcon from '@mui/icons-material/People'
 import HandshakeIcon from '@mui/icons-material/Handshake'
 import SettingsIcon from '@mui/icons-material/Settings'
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import LogoutIcon from '@mui/icons-material/Logout'
 import MenuIcon from '@mui/icons-material/Menu'
 import useLoader from '@/hooks/useLoader'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { AuthProvider } from '@/contexts/AuthContext'
+import * as browserutil from '@/utils/browserutil'
 
 const DRAWER_WIDTH = 220
 
@@ -55,10 +57,26 @@ export default function MainLayout({ children, title }: Props) {
     { label: '設定', icon: <SettingsIcon />, path: '/settings' },
   ]
 
+  const displayUser = info?.display_name || info?.email
+
+  const handleLogout = async () => {
+    try {
+      await browserutil.requestApi('GET', 'logout', '')
+    } catch {
+      // セッション切れでも構わずログインページへ
+    }
+    location.href = '/login'
+  }
+
   const drawer = (
     <Box display="flex" flexDirection="column" height="100%">
-      <Toolbar>
+      <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>CRM</Typography>
+        {displayUser && (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: DRAWER_WIDTH - 32 }}>
+            {displayUser}
+          </Typography>
+        )}
       </Toolbar>
       <Divider />
       <List dense>
@@ -88,6 +106,12 @@ export default function MainLayout({ children, title }: Props) {
             </ListItemButton>
           </ListItem>
         ))}
+        <ListItem disablePadding>
+          <ListItemButton onClick={handleLogout}>
+            <ListItemIcon sx={{ minWidth: 36 }}><LogoutIcon /></ListItemIcon>
+            <ListItemText primary="ログアウト" />
+          </ListItemButton>
+        </ListItem>
       </List>
     </Box>
   )
@@ -104,7 +128,12 @@ export default function MainLayout({ children, title }: Props) {
             <IconButton color="inherit" edge="start" onClick={() => setMobileOpen(!mobileOpen)} sx={{ mr: 1 }}>
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" noWrap>{title ?? 'CRM'}</Typography>
+            <Typography variant="h6" noWrap sx={{ flexGrow: 1 }}>{title ?? 'CRM'}</Typography>
+            {displayUser && (
+              <Typography variant="caption" noWrap sx={{ opacity: 0.85 }}>
+                {displayUser}
+              </Typography>
+            )}
           </Toolbar>
         </AppBar>
 

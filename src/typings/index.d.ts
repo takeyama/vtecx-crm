@@ -29,7 +29,8 @@ declare namespace VtecxApp {
 		contact?:Contact,
 		deal?:Deal,
 		activity?:Activity,
-		userprofile?:Userprofile
+		userprofile?:Userprofile,
+		groupmembers?:Groupmembers
 	}
 	interface Content {
 		______text: string
@@ -100,6 +101,23 @@ declare namespace VtecxApp {
 		is_deleted?:boolean
 	}
 	interface Userprofile {
-		display_name?:string
+		display_name?:string,
+		uid?:string,
+		is_admin?:boolean,
+		is_sales?:boolean,
+		is_viewer?:boolean,
+		email?:string,
+		family_name?:string,
+		given_name?:string,
+		family_name_kana?:string,
+		given_name_kana?:string,
+		department?:string,
+		title?:string,
+		phone?:string,
+		mobile?:string
+	}
+	interface Groupmembers {
+		group_name?:string,
+		uid?:string
 	}
 }
