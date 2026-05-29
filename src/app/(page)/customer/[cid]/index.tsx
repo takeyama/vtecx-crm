@@ -20,14 +20,17 @@ import {
   extractIdFromUri,
 } from '@/typings/crm'
 import {
-  fetchCustomer, updateCustomer, deleteCustomer,
+  fetchCustomer, deleteCustomer,
   fetchContacts, createContact, updateContact, deleteContact,
   fetchActivities, createActivity, updateActivity, deleteActivity,
+  fetchMembers, addMember, removeMember,
 } from '../fetcher'
 import { fetchDealsByCustomer } from '@/app/(page)/deal/fetcher'
 import { fetchUsers, UserRow } from '@/app/(page)/admin/users/fetcher'
+import { useAuthContext } from '@/contexts/AuthContext'
 import * as browserutil from '@/utils/browserutil'
 import Loader from '@/components/loader'
+import MainLayout from '@/components/MainLayout'
 
 interface TabPanelProps { children?: React.ReactNode; value: number; index: number }
 const TabPanel = ({ children, value, index }: TabPanelProps) => (
@@ -37,22 +40,25 @@ const TabPanel = ({ children, value, index }: TabPanelProps) => (
 const emptyContact: ContactEntity = {}
 const emptyActivity: ActivityEntity = { activity_type: 'call' }
 
-export default function CustomerDetailPage() {
+function CustomerDetailContent() {
   const router = useRouter()
   const { cid } = useParams<{ cid: string }>()
+  const { info } = useAuthContext()
+  const canWrite = info?.isAdmin || info?.isSales
 
   const [customer, setCustomer] = useState<CrmEntry | null>(null)
   const [contacts, setContacts] = useState<CrmEntry[]>([])
   const [activities, setActivities] = useState<CrmEntry[]>([])
   const [deals, setDeals] = useState<CrmEntry[]>([])
+  const [members, setMembers] = useState<CrmEntry[]>([])
+  const [addingMember, setAddingMember] = useState(false)
+  const [selectedMemberUid, setSelectedMemberUid] = useState('')
+  const [memberSaving, setMemberSaving] = useState(false)
   const [users, setUsers] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
   const [tab, setTab] = useState(0)
 
-  const [assignEditing, setAssignEditing] = useState(false)
-  const [assignedUid, setAssignedUid] = useState('')
-  const [assignSaving, setAssignSaving] = useState(false)
 
   const [contactDialog, setContactDialog] = useState<{ open: boolean; entry?: CrmEntry }>({ open: false })
   const [contactForm, setContactForm] = useState<ContactEntity>(emptyContact)
@@ -63,19 +69,20 @@ export default function CustomerDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      const [c, ct, ac, dl, userList] = await Promise.all([
+      const [c, ct, ac, dl, mb, userList] = await Promise.all([
         fetchCustomer(cid),
         fetchContacts(cid),
         fetchActivities(cid),
         fetchDealsByCustomer(cid),
+        fetchMembers(cid),
         fetchUsers(),
       ])
       setCustomer(c)
       setContacts(ct)
       setActivities(ac)
       setDeals(dl)
+      setMembers(mb)
       setUsers(userList)
-      setAssignedUid(c?.customer?.assigned_uid ?? '')
     } catch (e: any) {
       setError(browserutil.handleError(e).error.message)
     } finally {
@@ -85,16 +92,28 @@ export default function CustomerDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  const handleSaveAssignedUid = async () => {
-    setAssignSaving(true)
+  const handleAddMember = async () => {
+    if (!selectedMemberUid) return
+    setMemberSaving(true)
     try {
-      await updateCustomer(cid, { ...customer?.customer, assigned_uid: assignedUid || undefined })
-      setCustomer((prev) => prev ? { ...prev, customer: { ...prev.customer, assigned_uid: assignedUid || undefined } } : prev)
-      setAssignEditing(false)
+      await addMember(cid, selectedMemberUid)
+      setMembers(await fetchMembers(cid))
+      setAddingMember(false)
+      setSelectedMemberUid('')
     } catch (e: any) {
       setError(browserutil.handleError(e).error.message)
     } finally {
-      setAssignSaving(false)
+      setMemberSaving(false)
+    }
+  }
+
+  const handleRemoveMember = async (uid: string) => {
+    if (!confirm('この担当営業を外しますか？')) return
+    try {
+      await removeMember(cid, uid)
+      setMembers(await fetchMembers(cid))
+    } catch (e: any) {
+      setError(browserutil.handleError(e).error.message)
     }
   }
 
@@ -204,15 +223,21 @@ export default function CustomerDetailPage() {
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <IconButton onClick={() => router.push('/customer')}><ArrowBackIcon /></IconButton>
           <Typography variant="h5" flex={1}>{c?.name ?? '—'}</Typography>
-          <Button startIcon={<AddIcon />} onClick={() => router.push(`/deal/new?customer=${cid}`)}>
-            商談登録
-          </Button>
-          <Button startIcon={<EditIcon />} onClick={() => router.push(`/customer/${cid}/edit`)}>
-            編集
-          </Button>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={handleDeleteCustomer}>
-            削除
-          </Button>
+          {canWrite && (
+            <Button startIcon={<AddIcon />} onClick={() => router.push(`/deal/new?customer=${cid}`)}>
+              商談登録
+            </Button>
+          )}
+          {canWrite && (
+            <Button startIcon={<EditIcon />} onClick={() => router.push(`/customer/${cid}/edit`)}>
+              編集
+            </Button>
+          )}
+          {canWrite && (
+            <Button color="error" startIcon={<DeleteIcon />} onClick={handleDeleteCustomer}>
+              削除
+            </Button>
+          )}
         </Box>
 
         {/* 顧客基本情報 */}
@@ -239,42 +264,6 @@ export default function CustomerDetailPage() {
               <Typography variant="caption" color="text.secondary">住所</Typography>
               <Typography>{c?.address ?? '—'}</Typography>
             </Grid>
-            <Grid item xs={12} sm={6}>
-              <Typography variant="caption" color="text.secondary">担当者</Typography>
-              {assignEditing ? (
-                <Box display="flex" gap={1} alignItems="center" mt={0.5}>
-                  <FormControl size="small" sx={{ minWidth: 160 }}>
-                    <Select
-                      value={assignedUid}
-                      onChange={(e) => setAssignedUid(e.target.value)}
-                      displayEmpty
-                    >
-                      <MenuItem value="">（未割り当て）</MenuItem>
-                      {users.map((u) => (
-                        <MenuItem key={u.uid} value={u.uid}>
-                          {u.display_name ?? u.uid}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                  <Button size="small" variant="contained" onClick={handleSaveAssignedUid} disabled={assignSaving}>
-                    {assignSaving ? '保存中' : '保存'}
-                  </Button>
-                  <Button size="small" onClick={() => { setAssignedUid(c?.assigned_uid ?? ''); setAssignEditing(false) }}>
-                    取消
-                  </Button>
-                </Box>
-              ) : (
-                <Box display="flex" alignItems="center" gap={0.5}>
-                  <Typography>
-                    {users.find((u) => u.uid === c?.assigned_uid)?.display_name ?? c?.assigned_uid ?? '—'}
-                  </Typography>
-                  <IconButton size="small" onClick={() => setAssignEditing(true)}>
-                    <EditIcon fontSize="small" />
-                  </IconButton>
-                </Box>
-              )}
-            </Grid>
             {c?.memo && (
               <Grid item xs={12}>
                 <Typography variant="caption" color="text.secondary">メモ</Typography>
@@ -282,6 +271,59 @@ export default function CustomerDetailPage() {
               </Grid>
             )}
           </Grid>
+        </Paper>
+
+        {/* 担当営業 */}
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={1}>
+            <Typography variant="subtitle2" color="text.secondary">担当営業</Typography>
+            {canWrite && !addingMember && (
+              <Button size="small" startIcon={<AddIcon />} onClick={() => { setAddingMember(true); setSelectedMemberUid('') }}>
+                追加
+              </Button>
+            )}
+          </Box>
+          <Box display="flex" flexWrap="wrap" gap={1} alignItems="center">
+            {members.map((entry) => {
+              const uid = entry.member?.uid ?? ''
+              const displayName = users.find((u) => u.uid === uid)?.display_name ?? uid
+              return (
+                <Chip
+                  key={uid}
+                  label={displayName}
+                  size="small"
+                  color="primary"
+                  variant="outlined"
+                  onDelete={canWrite ? () => handleRemoveMember(uid) : undefined}
+                />
+              )
+            })}
+            {members.length === 0 && !addingMember && (
+              <Typography variant="body2" color="text.secondary">未設定</Typography>
+            )}
+            {addingMember && (
+              <Box display="flex" gap={1} alignItems="center">
+                <FormControl size="small" sx={{ minWidth: 160 }}>
+                  <Select
+                    value={selectedMemberUid}
+                    onChange={(e) => setSelectedMemberUid(e.target.value)}
+                    displayEmpty
+                  >
+                    <MenuItem value="">選択してください</MenuItem>
+                    {users
+                      .filter((u) => !members.some((m) => m.member?.uid === u.uid))
+                      .map((u) => (
+                        <MenuItem key={u.uid} value={u.uid}>{u.display_name ?? u.uid}</MenuItem>
+                      ))}
+                  </Select>
+                </FormControl>
+                <Button size="small" variant="contained" onClick={handleAddMember} disabled={!selectedMemberUid || memberSaving}>
+                  {memberSaving ? '追加中' : '追加'}
+                </Button>
+                <Button size="small" onClick={() => setAddingMember(false)}>取消</Button>
+              </Box>
+            )}
+          </Box>
         </Paper>
 
         {/* タブ */}
@@ -294,11 +336,13 @@ export default function CustomerDetailPage() {
 
         {/* 担当者タブ */}
         <TabPanel value={tab} index={0}>
-          <Box display="flex" justifyContent="flex-end" mb={1}>
-            <Button startIcon={<AddIcon />} size="small" onClick={() => openContactDialog()}>
-              担当者追加
-            </Button>
-          </Box>
+          {canWrite && (
+            <Box display="flex" justifyContent="flex-end" mb={1}>
+              <Button startIcon={<AddIcon />} size="small" onClick={() => openContactDialog()}>
+                担当者追加
+              </Button>
+            </Box>
+          )}
           <TableContainer component={Paper}>
             <Table size="small">
               <TableHead>
@@ -324,10 +368,12 @@ export default function CustomerDetailPage() {
                       <TableCell>{[ct.department, ct.title].filter(Boolean).join(' / ') || '—'}</TableCell>
                       <TableCell>{ct.email ?? '—'}</TableCell>
                       <TableCell>{ct.phone ?? ct.mobile ?? '—'}</TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" onClick={() => openContactDialog(entry)}><EditIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" color="error" onClick={() => handleDeleteContact(entry)}><DeleteIcon fontSize="small" /></IconButton>
-                      </TableCell>
+                      {canWrite && (
+                        <TableCell align="right">
+                          <IconButton size="small" onClick={() => openContactDialog(entry)}><EditIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" color="error" onClick={() => handleDeleteContact(entry)}><DeleteIcon fontSize="small" /></IconButton>
+                        </TableCell>
+                      )}
                     </TableRow>
                   )
                 })}
@@ -338,11 +384,13 @@ export default function CustomerDetailPage() {
 
         {/* 対応履歴タブ */}
         <TabPanel value={tab} index={1}>
-          <Box display="flex" justifyContent="flex-end" mb={1}>
-            <Button startIcon={<AddIcon />} size="small" onClick={() => openActivityDialog()}>
-              対応履歴追加
-            </Button>
-          </Box>
+          {canWrite && (
+            <Box display="flex" justifyContent="flex-end" mb={1}>
+              <Button startIcon={<AddIcon />} size="small" onClick={() => openActivityDialog()}>
+                対応履歴追加
+              </Button>
+            </Box>
+          )}
           <Stack spacing={1}>
             {activities.length === 0 ? (
               <Typography color="text.secondary" align="center">対応履歴がありません</Typography>
@@ -359,15 +407,22 @@ export default function CustomerDetailPage() {
                       <Typography fontWeight="bold">{ac.subject}</Typography>
                       {ac.description && <Typography variant="body2" color="text.secondary" mt={0.5}>{ac.description}</Typography>}
                       {ac.next_action && (
-                        <Typography variant="body2" mt={0.5}>
-                          <strong>次のアクション:</strong> {ac.next_action}
-                        </Typography>
+                        <Box display="flex" alignItems="center" gap={1} mt={0.5} flexWrap="wrap">
+                          <Typography variant="body2">
+                            <strong>次のアクション:</strong> {ac.next_action}
+                          </Typography>
+                          {ac.next_action_date && (
+                            <Chip size="small" label={ac.next_action_date} color="warning" sx={{ fontSize: '0.7rem' }} />
+                          )}
+                        </Box>
                       )}
                     </Box>
-                    <Box>
-                      <IconButton size="small" onClick={() => openActivityDialog(entry)}><EditIcon fontSize="small" /></IconButton>
-                      <IconButton size="small" color="error" onClick={() => handleDeleteActivity(entry)}><DeleteIcon fontSize="small" /></IconButton>
-                    </Box>
+                    {canWrite && (
+                      <Box>
+                        <IconButton size="small" onClick={() => openActivityDialog(entry)}><EditIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" color="error" onClick={() => handleDeleteActivity(entry)}><DeleteIcon fontSize="small" /></IconButton>
+                      </Box>
+                    )}
                   </Box>
                 </Paper>
               )
@@ -377,11 +432,13 @@ export default function CustomerDetailPage() {
 
         {/* 商談タブ */}
         <TabPanel value={tab} index={2}>
-          <Box display="flex" justifyContent="flex-end" mb={1}>
-            <Button startIcon={<AddIcon />} size="small" onClick={() => router.push(`/deal/new?customer=${cid}`)}>
-              商談登録
-            </Button>
-          </Box>
+          {canWrite && (
+            <Box display="flex" justifyContent="flex-end" mb={1}>
+              <Button startIcon={<AddIcon />} size="small" onClick={() => router.push(`/deal/new?customer=${cid}`)}>
+                商談登録
+              </Button>
+            </Box>
+          )}
           <TableContainer component={Paper}>
             <Table size="small">
               <TableHead>
@@ -467,6 +524,7 @@ export default function CustomerDetailPage() {
               <TextField label="内容詳細" multiline rows={3} value={activityForm.description ?? ''} onChange={(e) => setActivityForm((p) => ({ ...p, description: e.target.value }))} fullWidth />
               <TextField label="結果・成果" value={activityForm.outcome ?? ''} onChange={(e) => setActivityForm((p) => ({ ...p, outcome: e.target.value }))} fullWidth />
               <TextField label="次のアクション" value={activityForm.next_action ?? ''} onChange={(e) => setActivityForm((p) => ({ ...p, next_action: e.target.value }))} fullWidth />
+              <TextField label="次アクション日" type="date" value={activityForm.next_action_date ?? ''} onChange={(e) => setActivityForm((p) => ({ ...p, next_action_date: e.target.value || undefined }))} fullWidth slotProps={{ inputLabel: { shrink: true } }} />
               <Box display="flex" gap={2}>
                 <Button variant="contained" onClick={handleSaveActivity} disabled={saving}>{saving ? '保存中...' : '保存'}</Button>
                 <Button onClick={() => setActivityDialog({ open: false })}>キャンセル</Button>
@@ -476,5 +534,13 @@ export default function CustomerDetailPage() {
         </Dialog>
       </Box>
     </Loader>
+  )
+}
+
+export default function CustomerDetailPage() {
+  return (
+    <MainLayout>
+      <CustomerDetailContent />
+    </MainLayout>
   )
 }

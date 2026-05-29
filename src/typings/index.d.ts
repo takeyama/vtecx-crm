@@ -96,6 +96,7 @@ declare namespace VtecxApp {
 		description?:string,
 		outcome?:string,
 		next_action?:string,
+		next_action_date?:any,
 		contact_uri?:string,
 		created_uid?:string,
 		is_deleted?:boolean
@@ -119,5 +120,9 @@ declare namespace VtecxApp {
 	interface Groupmembers {
 		group_name?:string,
 		uid?:string
+	}
+	interface Member {
+		uid?:string,
+		is_deleted?:boolean
 	}
 }

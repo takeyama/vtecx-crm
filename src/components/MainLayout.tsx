@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import {
-  AppBar, Box, CircularProgress, CssBaseline, Divider, Drawer, IconButton,
+  AppBar, Box, Chip, CircularProgress, CssBaseline, Divider, Drawer, IconButton,
   List, ListItem, ListItemButton, ListItemIcon, ListItemText,
   Toolbar, Typography,
 } from '@mui/material'
@@ -70,13 +70,21 @@ export default function MainLayout({ children, title }: Props) {
 
   const drawer = (
     <Box display="flex" flexDirection="column" height="100%">
-      <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center' }}>
+      <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'center', py: 1.5 }}>
         <Typography variant="subtitle1" fontWeight="bold" noWrap>CRM</Typography>
         {displayUser && (
           <Typography variant="caption" color="text.secondary" noWrap sx={{ maxWidth: DRAWER_WIDTH - 32 }}>
             {displayUser}
           </Typography>
         )}
+        <Box display="flex" gap={0.5} mt={0.5} flexWrap="wrap">
+          {info?.isAdmin && <Chip label="管理者" size="small" color="error" sx={{ height: 18, fontSize: '0.65rem' }} />}
+          {info?.isSales && <Chip label="営業担当者" size="small" color="primary" sx={{ height: 18, fontSize: '0.65rem' }} />}
+          {info?.isViewer && <Chip label="閲覧者" size="small" color="default" sx={{ height: 18, fontSize: '0.65rem' }} />}
+          {!info?.isAdmin && !info?.isSales && !info?.isViewer && (
+            <Chip label="未割り当て" size="small" color="warning" sx={{ height: 18, fontSize: '0.65rem' }} />
+          )}
+        </Box>
       </Toolbar>
       <Divider />
       <List dense>

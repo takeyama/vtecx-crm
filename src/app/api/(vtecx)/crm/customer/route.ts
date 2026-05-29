@@ -13,8 +13,24 @@ export const GET = async (req: NextRequest): Promise<Response> => {
       return vtecxnext.response(200, feed ?? null)
     }
     const n = parseInt(vtecxnext.getParameter('n') ?? '1', 10)
-    const entries = await vtecxnext.getPageWithPagination('/crm/customer?l=25', n)
-    return vtecxnext.response(200, entries ?? null)
+    const status = vtecxnext.getParameter('status')
+    const q = vtecxnext.getParameter('q')
+    const params = ['f', 'l=25']
+    if (q) params.push(`customer.name-ft-${encodeURIComponent(q)}`)
+    else if (status) params.push(`customer.status-eq-${encodeURIComponent(status)}`)
+    const uri = `/crm/customer?${params.join('&')}`
+
+    // n=1 のときカーソルリストを作成し、ページ数情報を取得
+    let lastPageNumber = 0
+    let hasNext = false
+    if (n === 1) {
+      const info = await vtecxnext.pagination(uri, '1,50')
+      lastPageNumber = info?.lastPageNumber ?? 0
+      hasNext = info?.hasNext ?? false
+    }
+    const raw = lastPageNumber === 0 && n === 1 ? null : await vtecxnext.getPage(uri, n)
+    const entries = raw === null ? [] : Array.isArray(raw) ? raw : [raw]
+    return vtecxnext.response(200, { entries, lastPageNumber, hasNext, currentPage: n })
   } catch (e) {
     if (isVtecxNextError(e)) return vtecxnext.response(e.status, { feed: { title: e.message } })
     return vtecxnext.response(503, { feed: { title: 'Error occurred.' } })

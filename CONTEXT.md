@@ -113,6 +113,61 @@ const id = String(Date.now()).padStart(13, '0')  // "1748345678901"
 const uri = `/crm/customer/${id}`
 ```
 
+### ⭐ 最重要設計原則：1トランザクションにまとめる
+
+> **`put()` の `feed.entry` に複数エントリをまとめて、API 呼び出しを1回にすること。**  
+> 設計・実装の段階でこの原則を意識し、個別 PUT の乱立を避けること。
+
+```typescript
+// ❌ 個別 PUT（複数回 → パフォーマンス悪、途中失敗で中途半端な状態になる）
+await vtecxnext.put({ feed: { entry: [customerEntry] } })
+await vtecxnext.put({ feed: { entry: [contactPathEntry] } })
+await vtecxnext.put({ feed: { entry: [activityPathEntry] } })
+
+// ✅ 1回の PUT にまとめる（親を先頭に）
+await vtecxnext.put({
+  feed: {
+    entry: [
+      customerEntry,       // 親を先に
+      contactPathEntry,    // 子パス
+      activityPathEntry,   // 子パス
+    ]
+  }
+})
+```
+
+**適用場面：**
+- 新規登録：親エントリ＋子パス登録＋子エントリを同時
+- バルクインサート：CSV インポート等の複数件登録
+- 再インデックス：1顧客ぶんの全子エントリをまとめて再 PUT
+
+### ⭐ エイリアスを使った横断検索（逆引き）
+
+インデックスなしで「逆引き」を実現するパターン。担当営業→顧客一覧のような多対多の関係に使う。
+
+```
+一次パス: /crm/customer/{cid}/member/{uid}  ← getFeed('/crm/customer/{cid}/member') で正引き
+エイリアス: /crm/member/{uid}/{cid}          ← getFeed('/crm/member/{uid}') で逆引き
+```
+
+```typescript
+// 登録時: 顧客エントリの link 配列に alternate を追加（エイリアス親パス登録と1トランザクション）
+const customer = await vtecxnext.getEntry(`/crm/customer/${cid}`)
+await vtecxnext.put({
+  feed: { entry: [
+    { link: [{ ___rel: 'self', ___href: `/crm/member/${uid}` }], contributor },  // 親パス（先頭）
+    { ...(customer as any), link: [...(customer as any).link, { ___rel: 'alternate', ___href: `/crm/member/${uid}/${cid}` }] },
+  ] }
+})
+
+// 逆引き: getFeed で顧客エントリが直接返る（N+1 なし）
+const feed = await vtecxnext.getFeed(`/crm/member/${uid}`)
+// → entries は CrmEntry[] で customer フィールドがそのまま使える
+
+// 削除時: 顧客エントリの link から該当 alternate を除去して PUT
+const updated = existingLinks.filter((l: any) => l.___href !== `/crm/member/${uid}/${cid}`)
+await vtecxnext.put({ feed: { entry: [{ ...customer, link: updated }] } })
+
 ### ⚠️ 動的子パスの事前登録（必須）
 
 `/crm/customer/{cid}/contact/{ctid}` へ PUT するには、**親パス `/crm/customer/{cid}/contact` が vte.cx に登録済みでなければならない**。
@@ -192,6 +247,25 @@ export default function SomePage() {
 
 **理由**: `browserutil.handleError` は 403 を受け取ると `location.href = '/login'` で強制遷移する。`useAuthGuard` がリダイレクト前にデータ API が呼ばれると 403 → ログイン遷移になる。
 
+**⚠️ 詳細ページ（`/customer/[cid]`・`/deal/[did]` 等）も必ず MainLayout でラップすること。**  
+ラップしないと `useAuthContext()` の `info` が常に `null` になり、`canWrite` 判定が機能しない。
+
+```typescript
+// ✅ 正しいパターン（詳細ページも同様）
+function CustomerDetailContent() {  // ← 内側でデータ取得・useAuthContext
+  const { info } = useAuthContext()
+  // ...
+}
+
+export default function CustomerDetailPage() {  // ← 外側で MainLayout
+  return (
+    <MainLayout>
+      <CustomerDetailContent />
+    </MainLayout>
+  )
+}
+```
+
 ### AuthContext でログインユーザー情報を取得
 
 ```typescript
@@ -205,6 +279,25 @@ function SomeContent() {
 ```
 
 `info` は `MainLayout` の `useAuthGuard` が取得済みの値（追加APIコールなし）。
+
+### 権限によるボタン表示制御
+
+**デフォルト非表示・権限があるときのみ表示**するのが基本方針。
+
+```typescript
+const { info } = useAuthContext()
+const canWrite = info?.isAdmin || info?.isSales  // 書き込み権限
+
+// 使い方: canWrite の場合のみボタンを表示
+{canWrite && <Button onClick={...}>新規登録</Button>}
+```
+
+| 権限 | 判定 | 用途 |
+|---|---|---|
+| `canWrite` | `isAdmin \|\| isSales` | 登録/編集/削除ボタン全般 |
+| `isAdmin` | `info?.isAdmin` | 管理者専用（ユーザー管理など） |
+
+> フロントエンドの制御はあくまで UX。vte.cx ACL がサーバー側で最終判定する。
 
 ### 管理者専用ページのパターン
 
@@ -245,11 +338,12 @@ src/
 │   │   ├── setup/                      初回表示名設定（未設定ユーザー用）
 │   │   └── pending/                    権限付与待ち（未割り当てユーザー用）
 │   └── api/(vtecx)/
-│       ├── crm/customer/[cid]/...      顧客 CRUD
+│       ├── crm/customer/[cid]/...      顧客 CRUD（contact/activity 子パス含む）
 │       ├── crm/deal/[did]/...          商談 CRUD
 │       ├── crm/user/me/route.ts        自分のプロフィール+ロール取得・保存
-│       ├── crm/user/route.ts           全ユーザー一覧（管理者向け）
-│       └── admin/groups/route.ts       グループ管理（権限付与・剥奪）
+│       ├── crm/user/route.ts           全ユーザー一覧（email 付加）
+│       ├── admin/groups/route.ts       グループ管理（権限付与・剥奪）
+│       └── admin/reindex/route.ts      既存データへのインデックス再適用バッチ
 ├── components/
 │   └── MainLayout.tsx                  サイドバーナビ + useAuthGuard + AuthContext提供
 ├── contexts/
@@ -302,7 +396,14 @@ contributor: [
 | `normalizeEntries(data)` を使う | `normalizeEntries` は削除済み。`Array.isArray(data) ? data : []` を使う |
 | `(data as CrmEntry[]) ?? []` でリスト取得 | `?? []` は `{}` 等のオブジェクトを通過させる。`Array.isArray` チェックが必要 |
 | `data?.feed?.entry` でエントリにアクセス | API Route は feed ラッパーなしで直接配列を返す |
-| 顧客作成後に子パス（`/contact`・`/activity`）を登録しない | 顧客 POST と同時に `Promise.all` で子パスを登録する |
+| `?status=active` のようにフィールド値を直接 URI に入れる | `?f&customer.status-eq-active` が正しい（`f` フラグ必須 + `エンティティ名.フィールド名-演算子-値`） |
+| 同一フィールドのインデックスを複数パスに設定するとき別々の行に書く | `|` で1行にまとめる: `customer.status:/crm/customer\|/crm/member`（"Already specified" エラー回避） |
+| インデックス設定後に既存データが検索されない | インデックスは設定後に**登録したデータにのみ**適用される。既存データを検索対象にするにはそのエントリを再 PUT する必要がある |
+| エイリアス逆引きができない | エイリアス親パス（`/crm/member/{uid}`）が未登録。登録時に `put()` で事前登録してからエントリを作成する |
+| 削除後にエイリアス逆引きで消えたはずのデータが消えない | 論理削除時もエイリアスリンク（`rel="alternate"`）を保持し、`is_deleted: true` で管理。取得側でフィルタする |
+| 親子データを別々の `put()` で登録する | `feed.entry` 配列に親・子を**親を先に**まとめて1回の `put()` で登録する |
+| 親子を同一 `put()` に含めるとき子を先に置く | 配列の先頭に親エントリを置かないと `Parent path is required` エラーになる |
+| 顧客作成後に子パス（`/contact`・`/activity`）を登録しない | 顧客 POST と同時に同一 `put()` の配列に含めて1トランザクションで登録する |
 | contact/activity を PUT して "Parent path is required" が出たまま | 親パスを PUT で登録してからリトライする |
 | `fetchCustomers` を外側コンポーネントの `useEffect` に書く | 内側コンポーネントに移動する |
 | 更新時に `contributor` を省略する | `existing?.contributor` を必ず引き継ぐ |
@@ -310,6 +411,28 @@ contributor: [
 | `entry.title` / `entry.rights` / `entry.summary` をカスタムデータフィールドに使う | `template.xml` でスキーマ定義した専用エンティティのフィールドに入れる |
 | `rights: JSON.stringify({...})` で構造データを文字列として詰め込む | スキーマ定義したフィールドに直接セットする |
 | API ルートでロールチェックを実装する | ACL（contributor / folderacls）に任せる |
+
+### ⚠️ スキーマ追加の制約（必須）
+
+**新しいフィールドは必ずエンティティの末尾に追加すること。途中への挿入はスキーマ破損の原因になる。**
+
+```xml
+<!-- ❌ NG: 途中に挿入 -->
+activity
+ ...
+ next_action(string){500}
+ next_action_date(date)   ← NG
+ contact_uri(string){500}
+ is_deleted(boolean)
+
+<!-- ✅ OK: 末尾に追記 -->
+activity
+ ...
+ next_action(string){500}
+ contact_uri(string){500}
+ is_deleted(boolean)
+ next_action_date(date)   ← OK（末尾）
+```
 
 ### ⚠️ スキーマ定義の原則（必須）
 

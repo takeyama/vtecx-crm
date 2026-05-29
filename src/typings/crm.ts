@@ -57,6 +57,7 @@ export interface ActivityEntity {
   description?: string
   outcome?: string
   next_action?: string
+  next_action_date?: string
   contact_uri?: string
   created_uid?: string
   is_deleted?: boolean
@@ -84,9 +85,15 @@ export interface GroupmembersEntity {
   uid?: string
 }
 
+export interface MemberEntity {
+  uid?: string
+  is_deleted?: boolean
+}
+
 export interface CrmEntry {
   userprofile?: UserProfileEntity
   groupmembers?: GroupmembersEntity
+  member?: MemberEntity
   id?: string
   link?: { ___href?: string; ___rel?: string }[]
   contributor?: { uri?: string; email?: string }[]
