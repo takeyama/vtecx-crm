@@ -11,12 +11,16 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import { CrmEntry, DEAL_STAGE_LABEL, DealStage, extractIdFromUri } from '@/typings/crm'
 import { fetchDeal, deleteDeal } from '../fetcher'
+import { useAuthContext } from '@/contexts/AuthContext'
 import * as browserutil from '@/utils/browserutil'
 import Loader from '@/components/loader'
+import MainLayout from '@/components/MainLayout'
 
-export default function DealDetailPage() {
+function DealDetailContent() {
   const router = useRouter()
   const { did } = useParams<{ did: string }>()
+  const { info } = useAuthContext()
+  const canWrite = info?.isAdmin || info?.isSales
 
   const [deal, setDeal] = useState<CrmEntry | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,12 +61,16 @@ export default function DealDetailPage() {
         <Box display="flex" alignItems="center" gap={1} mb={2}>
           <IconButton onClick={() => router.push('/deal')}><ArrowBackIcon /></IconButton>
           <Typography variant="h5" flex={1}>{d?.name ?? '—'}</Typography>
-          <Button startIcon={<EditIcon />} onClick={() => router.push(`/deal/${did}/edit`)}>
-            編集
-          </Button>
-          <Button color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
-            削除
-          </Button>
+          {canWrite && (
+            <Button startIcon={<EditIcon />} onClick={() => router.push(`/deal/${did}/edit`)}>
+              編集
+            </Button>
+          )}
+          {canWrite && (
+            <Button color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
+              削除
+            </Button>
+          )}
         </Box>
 
         <Paper sx={{ p: 2 }}>
@@ -119,5 +127,13 @@ export default function DealDetailPage() {
         </Paper>
       </Box>
     </Loader>
+  )
+}
+
+export default function DealDetailPage() {
+  return (
+    <MainLayout>
+      <DealDetailContent />
+    </MainLayout>
   )
 }

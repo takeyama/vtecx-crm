@@ -43,5 +43,13 @@
       { "uri": "urn:vte.cx:acl:+,CURDE" }
     ],
     "link": [{ "___rel": "self", "___href": "/_group/viewer" }]
+  },
+  {
+    "contributor": [
+      { "uri": "urn:vte.cx:acl:/_group/$admin,CURD" },
+      { "uri": "urn:vte.cx:acl:/_group/sales,CURDE" },
+      { "uri": "urn:vte.cx:acl:/_group/viewer,RE" }
+    ],
+    "link": [{ "___rel": "self", "___href": "/crm/member" }]
   }
 ]

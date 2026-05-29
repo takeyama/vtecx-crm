@@ -15,18 +15,22 @@
 |---|---|:---:|---|
 | `n` | number | | ページ番号（デフォルト: 1）、1ページ25件 |
 | `all` | string | | `1` を指定すると全件取得（ページングなし）。商談フォームの顧客 Select 向け。 |
+| `q` | string | | フリーワード（全文検索）。指定時は `status` は無効 |
+| `status` | string | | ステータスで絞り込み（`customer.status-eq-`） |
 
-**レスポンス**: `Entry[]`（直接配列）
-
+**レスポンス**（ページングあり）:
 ```json
-[
-  {
-    "id": "/crm/customer/1748345678901,1",
-    "link": [{ "___href": "/crm/customer/1748345678901", "___rel": "self" }],
-    "customer": { "name": "株式会社テスト", "status": "active", ... }
-  }
-]
+{
+  "entries": [ { "id": "...", "customer": { ... } } ],
+  "lastPageNumber": 5,
+  "hasNext": false,
+  "currentPage": 1
+}
 ```
+
+> `lastPageNumber` は `n=1` のときのみ返る（`n>1` のときは `0`）。クライアントは `n=1` のレスポンスで取得した値を保持し続ける。  
+> `hasNext === true` のときは 50 ページ以上存在する（ページ範囲 `1,50` で作成したカーソルを超えるデータがある）。  
+> `all=1` 指定時はページングなしで `Entry[]`（直接配列）を返す。
 
 ---
 
@@ -48,6 +52,19 @@
 ```
 
 **レスポンス**: `{ "feed": { "title": "/crm/customer/1748345678901" } }`
+
+---
+
+### POST `/api/crm/customer/bulk`
+
+顧客を一括登録（1トランザクション）。全エントリ（顧客本体 + `/contact`・`/activity` 子パス）を1回の `put()` でまとめて登録する。CSV インポートで使用。
+
+**リクエストボディ**:
+```json
+{ "customers": [ { "name": "株式会社A", "status": "prospect" }, ... ] }
+```
+
+**レスポンス**: `{ "feed": { "title": "100" } }`（登録件数）
 
 ---
 
@@ -106,6 +123,60 @@
 
 ---
 
+## 担当営業 API
+
+### GET `/api/crm/customer/{cid}/member`
+
+その顧客の担当営業一覧を取得。顧客エントリの `link` 配列から `rel="alternate"` のパスを抽出して返す。
+
+**レスポンス**: `[{ "member": { "uid": "user123" } }, ...]`
+
+---
+
+### POST `/api/crm/customer/{cid}/member`
+
+担当営業を追加。エイリアス親パス `/crm/member/{uid}` の登録と顧客エントリへの `rel="alternate"` 付与を**1トランザクション**で実行する。
+
+**リクエストボディ**:
+```json
+{ "uid": "user123" }
+```
+
+---
+
+### DELETE `/api/crm/customer/{cid}/member/{uid}`
+
+顧客エントリの `link` 配列から該当の `alternate` リンクを除去して PUT する（物理的に除去）。
+
+---
+
+### GET `/api/crm/member/{uid}`
+
+エイリアスパス経由で、指定ユーザーが担当する顧客一覧を取得。  
+顧客エントリに `rel="alternate"` が付与されているため、`getFeed` で顧客エントリが直接返る（N+1 なし）。  
+権限を持つ全ロール（admin / sales / viewer）が利用可能。  
+フィルタ・ページングも通常どおり使用可能（インデックス設定が必要）。
+
+| パラメータ | 型 | 説明 |
+|---|---|---|
+| `n` | number | ページ番号（デフォルト: 1） |
+| `status` | string | ステータスフィルタ（`customer.status-eq-`）。インデックス要 |
+| `q` | string | 顧客名フリーワード検索（`customer.name-ft-`）。インデックス要 |
+
+**レスポンス**（ページングあり）:
+```json
+{
+  "entries": [ { "id": "/crm/customer/{cid},1", "link": [...], "customer": { ... } } ],
+  "lastPageNumber": 3,
+  "hasNext": false,
+  "currentPage": 1
+}
+```
+
+> レスポンスは通常の顧客エントリと同じ形式。`n=1` のときのみ `lastPageNumber` が返る。
+
+---
+
 ## 対応履歴 API
 
 ### GET `/api/crm/customer/{cid}/activity`
@@ -157,8 +228,22 @@
 |---|---|:---:|---|
 | `n` | number | | ページ番号（デフォルト: 1）、1ページ50件。`customer` 未指定時のみ有効 |
 | `customer` | string | | 顧客 cid を指定すると `customer_uri` でフィルタして全件返す（`getFeed` 使用）。顧客詳細の商談タブ向け。インデックス要 |
+| `q` | string | | フリーワード（全文検索）。指定時は他フィルタは無効 |
+| `stage` | string | | フェーズで絞り込み（`deal.stage-eq-`） |
+| `date_from` | string | | クローズ予定日 From（`deal.expected_close_date-ge-`） |
+| `date_to` | string | | クローズ予定日 To（`deal.expected_close_date-le-`） |
 
-**レスポンス**: `Entry[]`
+**レスポンス**（ページングあり）:
+```json
+{
+  "entries": [ { "id": "...", "deal": { ... } } ],
+  "lastPageNumber": 3,
+  "hasNext": false,
+  "currentPage": 1
+}
+```
+
+> `customer=` 指定時はページングなしで `Entry[]`（直接配列）を返す。
 
 ---
 
@@ -255,6 +340,19 @@
 各ユーザーの `email` は `/_user/{uid}` の `contributor[0].email` から `Promise.all` で並行取得して付加する。
 
 **レスポンス**: `Entry[]`（`userprofile.email` 含む）
+
+---
+
+## インデックス再適用 API（管理者専用）
+
+### POST `/api/admin/reindex`
+
+インデックス設定前に登録された既存データに対してインデックスを再適用する。  
+全エントリ（顧客・商談・ユーザー・担当者・対応履歴）を取得して PUT し直す。
+
+**レスポンス**: `{ "feed": { "title": "再インデックス完了: N 件処理" } }`
+
+> ユーザー管理画面の「インデックス再適用」ボタンから実行できる。
 
 ---
 

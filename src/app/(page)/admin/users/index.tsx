@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from 'react'
 import {
-  Alert, Box, Chip, CircularProgress, IconButton, Paper,
+  Alert, Box, Button, Chip, CircularProgress, IconButton, Paper,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Tooltip, Typography,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import RemoveIcon from '@mui/icons-material/Remove'
+import SyncIcon from '@mui/icons-material/Sync'
 import { useRouter } from 'next/navigation'
 import MainLayout from '@/components/MainLayout'
 import { useAuthContext } from '@/contexts/AuthContext'
@@ -28,6 +29,22 @@ function AdminUsersContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
   const [updating, setUpdating] = useState<string>()
+  const [reindexing, setReindexing] = useState(false)
+  const [reindexResult, setReindexResult] = useState<string>()
+
+  const handleReindex = async () => {
+    setReindexing(true)
+    setReindexResult(undefined)
+    setError(undefined)
+    try {
+      const data = await browserutil.requestApi('POST', 'admin/reindex', '', '{}', { 'Content-Type': 'application/json' })
+      setReindexResult(data?.feed?.title ?? '完了')
+    } catch (e: any) {
+      setError(browserutil.handleError(e).error.message)
+    } finally {
+      setReindexing(false)
+    }
+  }
 
   useEffect(() => {
     if (info && !info.isAdmin) {
@@ -81,9 +98,23 @@ function AdminUsersContent() {
 
   return (
     <Box p={3} maxWidth={800}>
-      <Typography variant="h5" mb={3}>ユーザー管理</Typography>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5">ユーザー管理</Typography>
+        <Tooltip title="インデックス設定後に登録済みの既存データにインデックスを適用します">
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={reindexing ? <CircularProgress size={16} /> : <SyncIcon />}
+            onClick={handleReindex}
+            disabled={reindexing}
+          >
+            {reindexing ? '処理中...' : 'インデックス再適用'}
+          </Button>
+        </Tooltip>
+      </Box>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {reindexResult && <Alert severity="success" sx={{ mb: 2 }}>{reindexResult}</Alert>}
 
       <TableContainer component={Paper}>
         <Table size="small">

@@ -53,6 +53,7 @@ activity
  contact_uri(string){500}
  created_uid(string){255}
  is_deleted(boolean)
+ next_action_date(date)
 userprofile
  display_name(string){100}!
  uid(string){255}
@@ -71,9 +72,21 @@ userprofile
 groupmembers
  group_name(string){100}!
  uid(string){255}!
+member
+ uid(string){255}!
+ is_deleted(boolean)
 </content>
 <link href="/_settings/template" rel="self"></link>
-<rights></rights>
+<rights>
+customer.status:/crm/customer|/crm/member
+customer.assigned_uid:/crm/customer
+customer.name;/crm/customer|/crm/member
+deal.stage:/crm/deal
+deal.customer_uri:/crm/deal
+deal.expected_close_date:/crm/deal
+deal.name;/crm/deal
+activity.next_action_date:/crm/customer
+</rights>
 </entry>
 <entry>
   <link href="/_settings/template_property" rel="self"/>
